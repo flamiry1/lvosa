@@ -11,11 +11,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"lvosa/backend/internal/config"
 	"lvosa/backend/internal/handlers"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -32,6 +34,20 @@ func main() {
 	}
 	slog.SetDefault(setLogger(cfg))
 	gin.SetMode(cfg.GinMode)
+	startCtx, startCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer startCancel()
+	pool, err := pgxpool.New(startCtx, cfg.DSN)
+	if err != nil {
+		slog.Error("DSN is invalid", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	err = pool.Ping(startCtx)
+	if err != nil {
+		slog.Error("db failed to connect", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("db connected")
 	s := store.New()
 	sr := service.New(s)
 	r := gin.New()
@@ -50,7 +66,7 @@ func main() {
 	errCh := make(chan error, 1)
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err = srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
