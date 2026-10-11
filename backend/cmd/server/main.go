@@ -16,6 +16,7 @@ import (
 	"lvosa/backend/internal/handlers"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func setLogger(c config.Config) *slog.Logger {
@@ -24,6 +25,7 @@ func setLogger(c config.Config) *slog.Logger {
 	return logger
 }
 func main() {
+	_ = godotenv.Load()
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Error found in configuration:\n%v", err)

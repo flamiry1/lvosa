@@ -17,6 +17,7 @@ type Config struct {
 	WriteTimeout    time.Duration
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
+	DSN             string
 }
 
 func getDuration(n string) (time.Duration, error) {
@@ -35,6 +36,10 @@ func getDuration(n string) (time.Duration, error) {
 func Load() (Config, error) {
 	var cfg Config
 	var err error
+	cfg.DSN = os.Getenv("DB_DSN")
+	if cfg.DSN == "" {
+		return Config{}, fmt.Errorf("DB_DSN: empty db path")
+	}
 	if p := os.Getenv("PORT"); p == "" {
 		cfg.Port = ":8080"
 	} else if convertedPort, err := strconv.Atoi(p); err == nil && (1 <= convertedPort && convertedPort <= 65535) {
