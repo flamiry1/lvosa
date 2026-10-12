@@ -86,22 +86,35 @@ func TestServiceHandlers(t *testing.T) {
 	r.Use(gin.Recovery())
 	h := New(fake)
 	h.RegisterRouters(r)
+	tests := []struct {
+		name        string
+		path        string
+		wantCode    int
+		wantMessage string
+	}{
+		{name: "internal error trying to get one item", path: "/item/1", wantCode: http.StatusInternalServerError, wantMessage: `{"status":"internal server error"}`},
+		{name: "internal error trying to get all items", path: "/items", wantCode: http.StatusInternalServerError, wantMessage: `{"status":"internal server error"}`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rec := doRequest(t, r, http.MethodGet, test.path, "")
+			if rec.Code != test.wantCode {
+				t.Fatalf("unexpected status = %d, body %q", rec.Code, rec.Body.String())
+			}
+			if rec.Body.String() != test.wantMessage {
+				t.Fatalf("wrong internal error message %s, want %s", rec.Body.String(), test.wantMessage)
+			}
+		})
+	}
 
-	rec := doRequest(t, r, http.MethodGet, "/item/1", "")
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("unexpected status = %d, body %q", rec.Code, rec.Body.String())
-	}
-	if strings.Contains(rec.Body.String(), "db down") {
-		t.Fatalf("internal error fled to client")
-	}
 }
 
 type fakeService struct {
 	err error
 }
 
-func (f *fakeService) List(ctx context.Context) []models.Item {
-	return []models.Item{}
+func (f *fakeService) List(ctx context.Context) ([]models.Item, error) {
+	return []models.Item{}, f.err
 }
 
 func (f *fakeService) Get(ctx context.Context, id int) (models.Item, error) {

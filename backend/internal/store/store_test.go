@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"lvosa/backend/internal/models"
+	"slices"
 	"sync"
 	"testing"
 )
@@ -42,7 +43,10 @@ func TestCreate(t *testing.T) {
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("expected: %v, received: %v", test.wantErr, err)
 			}
-			allItems := store.All(context.Background())
+			allItems, err := store.All(context.Background())
+			if err != nil {
+				t.Fatalf("unexpected error returned %v", err)
+			}
 			if len(allItems) != test.numberItems {
 				t.Fatalf("expected number of ids: %d, received: %d", test.numberItems, len(allItems))
 			}
@@ -115,13 +119,38 @@ func TestDelete(t *testing.T) {
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("expected error: %v, received: %v", test.wantErr, err)
 			}
-			items := store.All(context.Background())
+			items, err := store.All(context.Background())
+			if err != nil {
+				t.Fatalf("unexpected error returned %v", err)
+			}
 			if len(items) != test.wantNumberOfItems {
 				t.Fatalf("expected number of items: %d, received: %d", test.wantNumberOfItems, len(items))
 			}
 			_, err = store.Find(context.Background(), test.wantRemaining)
 			if err != nil {
 				t.Fatalf("expecting id %d not found: %v", test.wantRemaining, err)
+			}
+		})
+	}
+}
+
+func TestAll(t *testing.T) {
+	tests := []struct {
+		name      string
+		wantItems []models.Item
+		wantErr   error
+	}{
+		{name: "valid receiving items", wantItems: []models.Item{{Name: "prvi", ID: 1}, {Name: "drugi", ID: 2}}, wantErr: nil},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			store := createStore(t)
+			items, err := store.All(context.Background())
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("unexpected error %v, want %v", err, test.wantErr)
+			}
+			if !slices.Equal(items, test.wantItems) {
+				t.Fatalf("received items %v not equal to downloaded %v", items, test.wantItems)
 			}
 		})
 	}
@@ -142,8 +171,11 @@ func TestCreateConcurrent(t *testing.T) {
 
 	}
 	wg.Wait()
-	numberItems := len(store.All(context.Background()))
-	if numberItems != 3 {
-		t.Fatalf("expected 3, received %d", numberItems)
+	items, err := store.All(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error returned %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3, received %d", len(items))
 	}
 }

@@ -13,7 +13,7 @@ import (
 )
 
 type Service interface {
-	List(ctx context.Context) []models.Item
+	List(ctx context.Context) ([]models.Item, error)
 	Get(ctx context.Context, id int) (models.Item, error)
 	Create(ctx context.Context, item models.Item) (models.Item, error)
 	Update(ctx context.Context, item models.Item, id int) error
@@ -21,12 +21,12 @@ type Service interface {
 }
 
 func handleError(err error, c *gin.Context) {
-	if errors.Is(err, models.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"status": "not found"})
-		return
-	}
 	if errors.Is(err, models.ErrBadRequest) {
 		c.JSON(http.StatusBadRequest, gin.H{"status": models.ErrBadRequest.Error(), "message": err.Error()})
+		return
+	}
+	if errors.Is(err, models.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"status": "not found"})
 		return
 	}
 	if errors.Is(err, models.ErrConflict) {
@@ -89,7 +89,12 @@ func (h *Handler) createItem(c *gin.Context) {
 
 func (h *Handler) allItems(c *gin.Context) {
 	ctx := c.Request.Context()
-	c.JSON(http.StatusOK, h.svc.List(ctx))
+	items, err := h.svc.List(ctx)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
+	c.JSON(http.StatusOK, items)
 }
 
 func (h *Handler) updateItem(c *gin.Context) {

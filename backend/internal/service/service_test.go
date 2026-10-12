@@ -95,6 +95,28 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestServiceList(t *testing.T) {
+	errDB := errors.New("db down")
+	tests := []struct {
+		name    string
+		repoErr error
+		wantErr error
+	}{
+		{name: "repo ok", wantErr: nil, repoErr: nil},
+		{name: "repo failed", wantErr: errDB, repoErr: errDB},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fake := &fakeRepo{err: test.repoErr}
+			s := New(fake)
+			_, err := s.List(context.Background())
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("unexpected error %v, want %v", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func (f *fakeRepo) Create(ctx context.Context, n models.Item) (models.Item, error) {
 	f.lastItem = n
 	f.calls++
@@ -122,6 +144,6 @@ func (f *fakeRepo) Delete(ctx context.Context, id int) error {
 	return models.ErrNotFound
 }
 
-func (f *fakeRepo) All(ctx context.Context) []models.Item {
-	return []models.Item{}
+func (f *fakeRepo) All(ctx context.Context) ([]models.Item, error) {
+	return []models.Item{}, f.err
 }

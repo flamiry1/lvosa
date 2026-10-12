@@ -13,7 +13,7 @@ type ItemService struct {
 }
 
 type ItemRepository interface {
-	All(ctx context.Context) []models.Item
+	All(ctx context.Context) ([]models.Item, error)
 	Find(ctx context.Context, id int) (models.Item, error)
 	Create(ctx context.Context, item models.Item) (models.Item, error)
 	Update(ctx context.Context, id int, item models.Item) error
@@ -33,7 +33,7 @@ func checkNameLength(name string) (string, bool) {
 	return "", false
 }
 
-func (s *ItemService) List(ctx context.Context) []models.Item {
+func (s *ItemService) List(ctx context.Context) ([]models.Item, error) {
 	return s.repo.All(ctx)
 }
 

@@ -81,8 +81,8 @@ func (i *ItemMemory) Delete(ctx context.Context, id int) error {
 	return models.ErrNotFound
 }
 
-func (i *ItemMemory) All(ctx context.Context) []models.Item {
+func (i *ItemMemory) All(ctx context.Context) ([]models.Item, error) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	return slices.Clone(i.items)
+	return slices.Clone(i.items), nil
 }
