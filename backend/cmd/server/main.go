@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"lvosa/backend/internal/service"
 	"lvosa/backend/internal/store"
@@ -30,7 +29,8 @@ func main() {
 	_ = godotenv.Load()
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Error found in configuration:\n%v", err)
+		slog.Error("Error found in configuration:\n%v", err)
+		os.Exit(1)
 	}
 	slog.SetDefault(setLogger(cfg))
 	gin.SetMode(cfg.GinMode)
