@@ -5,7 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"lvosa/backend/internal/service"
-	"lvosa/backend/internal/store"
+	"lvosa/backend/internal/store/postgres"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,7 +29,7 @@ func main() {
 	_ = godotenv.Load()
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("Error found in configuration:\n%v", err)
+		slog.Error("Error found in configuration", "err", err)
 		os.Exit(1)
 	}
 	slog.SetDefault(setLogger(cfg))
@@ -48,8 +48,8 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("db connected")
-	s := store.New()
-	sr := service.New(s)
+	repo := postgres.New(pool)
+	sr := service.New(repo)
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	h := handlers.New(sr)
