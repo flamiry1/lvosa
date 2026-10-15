@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"lvosa/backend/internal/service"
 	"lvosa/backend/internal/store/postgres"
@@ -20,32 +21,23 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func setLogger(c config.Config) *slog.Logger {
-	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: c.Slog})
-	logger := slog.New(h)
-	return logger
-}
-func main() {
-	_ = godotenv.Load()
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("Error found in configuration", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("load config: %w", err)
 	}
-	slog.SetDefault(setLogger(cfg))
+	level.Set(cfg.Slog)
 	gin.SetMode(cfg.GinMode)
 	startCtx, startCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer startCancel()
 	pool, err := pgxpool.New(startCtx, cfg.DSN)
 	if err != nil {
-		slog.Error("DSN is invalid", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("parse dsn: %w", err)
 	}
 	defer pool.Close()
 	err = pool.Ping(startCtx)
 	if err != nil {
-		slog.Error("db failed to connect", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("ping db: %w", err)
 	}
 	slog.Info("db connected")
 	repo := postgres.New(pool)
@@ -66,7 +58,7 @@ func main() {
 	errCh := make(chan error, 1)
 
 	go func() {
-		if err = srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
@@ -75,18 +67,31 @@ func main() {
 
 	select {
 	case sig := <-quit:
-		slog.Info("shutdown signal received", "signal", sig.String())
+		slog.Info("shutdown", "signal", sig.String())
 	case err := <-errCh:
-		slog.Error("server failed", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("listen: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("server forcefully closed by context", "err", err)
-		return
+		return fmt.Errorf("server forcefully closed by context: %w", err)
 	}
 	slog.Info("Server successfully closed")
+	return nil
+}
+
+var level slog.LevelVar
+
+func main() {
+	_ = godotenv.Load()
+	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: &level})
+	logger := slog.New(h)
+	slog.SetDefault(logger)
+	err := run()
+	if err != nil {
+		slog.Error("server stopped with error", "err", err)
+		os.Exit(1)
+	}
 }
