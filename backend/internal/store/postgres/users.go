@@ -29,7 +29,7 @@ func (r *UserRepo) Create(ctx context.Context, user models.User) (models.User, e
 	err := r.pool.QueryRow(ctx, `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, created_at`, user.Email, user.PasswordHash, user.Role).Scan(&user.ID, &user.CreatedAt)
 	var pgErr *pgconn.PgError
 	if err != nil {
-		if errors.As(err, &pgErr) && pgErr.Code == violateDuplicate {
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
 			return models.User{}, fmt.Errorf("create user: %w", models.ErrConflict)
 		}
 		return models.User{}, fmt.Errorf("create user: %w", err)

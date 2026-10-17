@@ -34,7 +34,7 @@ func initUserRepo(t *testing.T) *UserRepo {
 	if err != nil {
 		t.Fatalf("failed to truncate table: %v", err)
 	}
-	_, err = repo.pool.Exec(ctx, `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3), ($4, $5, $6)`, "dima@gmail.com", "easypass", "student", "marjana@gmail.com", "hardpass", "admin")
+	_, err = repo.pool.Exec(ctx, `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3), ($4, $5, $6)`, "dima@gmail.com", "easypass", models.RoleStudent, "marjana@gmail.com", "hardpass", models.RoleAdmin)
 	if err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -43,15 +43,14 @@ func initUserRepo(t *testing.T) *UserRepo {
 
 func TestUserRepo_Create(t *testing.T) {
 	tests := []struct {
-		name       string
-		user       models.User
-		wantUser   models.User
-		wantErr    error
-		wantPgCode string
+		name     string
+		user     models.User
+		wantUser models.User
+		wantErr  error
 	}{
-		{name: "valid creation with role", user: models.User{Email: "newuser@gmail.com", PasswordHash: "newpassword", Role: models.RoleAdmin}, wantUser: models.User{ID: 3, Email: "newuser@gmail.com", PasswordHash: "newpassword", Role: models.RoleAdmin}, wantErr: nil, wantPgCode: ""},
-		{name: "exact double email creation", user: models.User{Email: "DIMA@gmail.com", PasswordHash: "newdimapass", Role: "admin"}, wantUser: models.User{}, wantErr: models.ErrConflict, wantPgCode: ""},
-		{name: "conflict creation", user: models.User{Email: "dima@gmail.com", PasswordHash: "newdimapass", Role: "admin"}, wantUser: models.User{}, wantErr: models.ErrConflict, wantPgCode: ""},
+		{name: "valid creation with role", user: models.User{Email: "newuser@gmail.com", PasswordHash: "newpassword", Role: models.RoleAdmin}, wantUser: models.User{ID: 3, Email: "newuser@gmail.com", PasswordHash: "newpassword", Role: models.RoleAdmin}, wantErr: nil},
+		{name: "exact double email creation", user: models.User{Email: "DIMA@gmail.com", PasswordHash: "newdimapass", Role: "admin"}, wantUser: models.User{}, wantErr: models.ErrConflict},
+		{name: "conflict creation", user: models.User{Email: "dima@gmail.com", PasswordHash: "newdimapass", Role: "admin"}, wantUser: models.User{}, wantErr: models.ErrConflict},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -97,7 +96,86 @@ func TestUserRepo_CreateCheck(t *testing.T) {
 	if !errors.As(err, &pgErr) {
 		t.Fatalf("received not pgErr type: %v", err)
 	}
-	if errors.As(err, &pgErr) && pgErr.Code != violateConstraint {
+	if errors.As(err, &pgErr) && pgErr.Code != checkViolation {
 		t.Fatalf("expected code: 23514, received: %s", pgErr.Code)
+	}
+}
+
+func TestUserRepo_FindByEmail(t *testing.T) {
+	tests := []struct {
+		name     string
+		email    string
+		wantUser models.User
+		wantErr  error
+	}{
+		{name: "valid find", email: "dima@gmail.com", wantUser: models.User{ID: 1, Email: "dima@gmail.com", PasswordHash: "easypass", Role: models.RoleStudent}, wantErr: nil},
+		{name: "invalid find (incorrect email)", email: "dima@gm.com", wantUser: models.User{}, wantErr: models.ErrNotFound},
+		{name: "valid find (different register)", email: "DIMA@gmail.com", wantUser: models.User{ID: 1, Email: "dima@gmail.com", PasswordHash: "easypass", Role: models.RoleStudent}, wantErr: nil},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := initUserRepo(t)
+			user, err := repo.FindByEmail(context.Background(), test.email)
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("expected error: %v, received: %v", test.wantErr, err)
+			}
+			if user.ID != test.wantUser.ID {
+				t.Fatalf("expected ID: %d, received: %d", test.wantUser.ID, user.ID)
+			}
+			if user.Email != test.wantUser.Email {
+				t.Fatalf("expected email: %s, received: %s", test.wantUser.Email, user.Email)
+			}
+			if user.PasswordHash != test.wantUser.PasswordHash {
+				t.Fatalf("expected password_hash: %s, received: %s", test.wantUser.PasswordHash, user.PasswordHash)
+			}
+			if user.Role != test.wantUser.Role {
+				t.Fatalf("expected role: %s, received: %s", test.wantUser.Role, user.Role)
+			}
+			if test.wantErr == nil {
+				if user.CreatedAt.IsZero() {
+					t.Fatalf("created_at not set")
+				}
+			}
+		})
+	}
+}
+
+func TestUserRepo_FindByID(t *testing.T) {
+	tests := []struct {
+		name     string
+		id       int
+		wantUser models.User
+		wantErr  error
+	}{
+		{name: "valid find byID", id: 1, wantUser: models.User{ID: 1, Email: "dima@gmail.com", PasswordHash: "easypass", Role: models.RoleStudent}, wantErr: nil},
+		{name: "invalid find byID", id: 99, wantUser: models.User{}, wantErr: models.ErrNotFound},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := initUserRepo(t)
+			user, err := repo.FindByID(context.Background(), test.id)
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("expected error: %v, received: %v", test.wantErr, err)
+			}
+			if user.ID != test.wantUser.ID {
+				t.Fatalf("expected ID: %d, received: %d", test.wantUser.ID, user.ID)
+			}
+			if user.Email != test.wantUser.Email {
+				t.Fatalf("expected email: %s, received: %s", test.wantUser.Email, user.Email)
+			}
+			if user.PasswordHash != test.wantUser.PasswordHash {
+				t.Fatalf("expected password_hash: %s, received: %s", test.wantUser.PasswordHash, user.PasswordHash)
+			}
+			if user.Role != test.wantUser.Role {
+				t.Fatalf("expected role: %s, received: %s", test.wantUser.Role, user.Role)
+			}
+			if test.wantErr == nil {
+				if user.CreatedAt.IsZero() {
+					t.Fatalf("created_at not set")
+				}
+			}
+		})
 	}
 }

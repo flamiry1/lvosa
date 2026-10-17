@@ -42,7 +42,7 @@ func initRepo(t *testing.T) *ItemRepo {
 	return repo
 }
 
-func TestFind(t *testing.T) {
+func TestItemRepo_Find(t *testing.T) {
 	tests := []struct {
 		name     string
 		id       int
@@ -66,7 +66,7 @@ func TestFind(t *testing.T) {
 	}
 }
 
-func TestCreate(t *testing.T) {
+func TestItemRepo_Create(t *testing.T) {
 	tests := []struct {
 		name         string
 		newName      string
@@ -104,7 +104,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestItemRepo_Update(t *testing.T) {
 	tests := []struct {
 		name      string
 		newName   string
@@ -145,7 +145,7 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
-func TestAll(t *testing.T) {
+func TestItemRepo_All(t *testing.T) {
 	tests := []struct {
 		name      string
 		wantItems []models.Item
@@ -167,7 +167,7 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func TestDelete(t *testing.T) {
+func TestItemRepo_Delete(t *testing.T) {
 	tests := []struct {
 		name              string
 		ID                int
@@ -201,7 +201,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestConcurrent(t *testing.T) {
+func TestItemRepo_Concurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	testItem := models.Item{Name: "testNAME"}
 	r := initRepo(t)
@@ -224,7 +224,7 @@ func TestConcurrent(t *testing.T) {
 	}
 }
 
-func TestAllEmptyItems(t *testing.T) {
+func TestItemRepo_AllEmptyItems(t *testing.T) {
 	r := initRepo(t)
 	_, err := r.pool.Exec(context.Background(), `TRUNCATE items RESTART IDENTITY`)
 	if err != nil {
