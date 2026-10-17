@@ -1,16 +1,29 @@
 package models
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 type Item struct {
 	Name string `json:"name" binding:"required"`
 	ID   int    `json:"id"`
 }
 
-type Person struct {
-	Name       string `json:"name" binding:"required"`
-	Occupation string `json:"occupation" binding:"required"`
+type User struct {
+	ID           int       `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"`
+	Role         string    `json:"role"`
+	CreatedAt    time.Time `json:"created_at"`
 }
+
+type Role string
+
+const (
+	RoleStudent Role = "student"
+	RoleAdmin   Role = "admin"
+)
 
 var ErrBadRequest = errors.New("bad request")
 
