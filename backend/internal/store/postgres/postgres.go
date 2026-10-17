@@ -18,6 +18,11 @@ type ItemRepo struct {
 	pool *pgxpool.Pool
 }
 
+const (
+	violateConstraint string = "23514"
+	violateDuplicate  string = "23505"
+)
+
 func New(p *pgxpool.Pool) *ItemRepo {
 	return &ItemRepo{pool: p}
 }
@@ -26,7 +31,7 @@ func (db *ItemRepo) Create(ctx context.Context, item models.Item) (models.Item, 
 	err := db.pool.QueryRow(ctx, `INSERT INTO items (name) VALUES ($1) RETURNING id`, item.Name).Scan(&item.ID)
 	var pgErr *pgconn.PgError
 	if err != nil {
-		if errors.As(err, &pgErr) && (pgErr.Code == "23505") {
+		if errors.As(err, &pgErr) && (pgErr.Code == violateDuplicate) {
 			return models.Item{}, fmt.Errorf("create item: %w", models.ErrConflict)
 		}
 		return models.Item{}, fmt.Errorf("create item: %w", err)
@@ -70,7 +75,7 @@ func (db *ItemRepo) Update(ctx context.Context, id int, item models.Item) error 
 	tag, err := db.pool.Exec(ctx, `UPDATE items SET name = $1 WHERE id = $2`, item.Name, id)
 	var pgErr *pgconn.PgError
 	if err != nil {
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == violateDuplicate {
 			return fmt.Errorf("update item: %w", models.ErrConflict)
 		}
 		return fmt.Errorf("update item: %w", err)
