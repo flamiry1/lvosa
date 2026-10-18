@@ -26,13 +26,55 @@ func TestCreate(t *testing.T) {
 		repoErr   error
 	}{
 		{name: "conflict from repo", item: models.Item{Name: "dimondr"}, wantErr: models.ErrConflict, wantCalls: 1, wantName: "dimondr", repoErr: fmt.Errorf("%w: name already registered", models.ErrConflict)},
-		{name: "empty name", item: models.Item{Name: "  "}, wantErr: models.ErrBadRequest, wantCalls: 0, wantName: ""},
-		{name: "1 symbol name", item: models.Item{Name: "a"}, wantErr: nil, wantCalls: 1, wantName: "a"},
-		{name: "name with spaces", item: models.Item{Name: "   dimas  "}, wantErr: nil, wantCalls: 1, wantName: "dimas"},
-		{name: "valid name", item: models.Item{Name: "dimas"}, wantErr: nil, wantCalls: 1, wantName: "dimas"},
-		{name: "100 symbols of Latin name", item: models.Item{Name: strings.Repeat("a", 100)}, wantErr: nil, wantCalls: 1, wantName: strings.Repeat("a", 100)},
-		{name: "101 symbols of Latin name", item: models.Item{Name: strings.Repeat("a", 101)}, wantErr: models.ErrBadRequest, wantCalls: 0, wantName: ""},
-		{name: "100 symbols of Slovenian name", item: models.Item{Name: strings.Repeat("č", 100)}, wantErr: nil, wantCalls: 1, wantName: strings.Repeat("č", 100)},
+		{
+			name:      "empty name",
+			item:      models.Item{Name: "  "},
+			wantErr:   models.ErrBadRequest,
+			wantCalls: 0,
+			wantName:  "",
+		},
+		{
+			name:      "1 symbol name",
+			item:      models.Item{Name: "a"},
+			wantErr:   nil,
+			wantCalls: 1,
+			wantName:  "a",
+		},
+		{
+			name:      "name with spaces",
+			item:      models.Item{Name: "   dimas  "},
+			wantErr:   nil,
+			wantCalls: 1,
+			wantName:  "dimas",
+		},
+		{
+			name:      "valid name",
+			item:      models.Item{Name: "dimas"},
+			wantErr:   nil,
+			wantCalls: 1,
+			wantName:  "dimas",
+		},
+		{
+			name:      "100 symbols of Latin name",
+			item:      models.Item{Name: strings.Repeat("a", 100)},
+			wantErr:   nil,
+			wantCalls: 1,
+			wantName:  strings.Repeat("a", 100),
+		},
+		{
+			name:      "101 symbols of Latin name",
+			item:      models.Item{Name: strings.Repeat("a", 101)},
+			wantErr:   models.ErrBadRequest,
+			wantCalls: 0,
+			wantName:  "",
+		},
+		{
+			name:      "100 symbols of Slovenian name",
+			item:      models.Item{Name: strings.Repeat("č", 100)},
+			wantErr:   nil,
+			wantCalls: 1,
+			wantName:  strings.Repeat("č", 100),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

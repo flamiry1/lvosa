@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"lvosa/backend/internal/models"
+	"lvosa/backend/internal/service"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var _ service.UserRepository = (*UserRepo)(nil)
 
 type UserRepo struct {
 	pool *pgxpool.Pool
