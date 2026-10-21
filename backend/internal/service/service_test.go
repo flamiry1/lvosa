@@ -25,7 +25,13 @@ func TestCreate(t *testing.T) {
 		wantName  string
 		repoErr   error
 	}{
-		{name: "conflict from repo", item: models.Item{Name: "dimondr"}, wantErr: models.ErrConflict, wantCalls: 1, wantName: "dimondr", repoErr: fmt.Errorf("%w: name already registered", models.ErrConflict)},
+		{
+			name:      "conflict from repo",
+			item:      models.Item{Name: "dimondr"},
+			wantErr:   models.ErrConflict,
+			wantCalls: 1, wantName: "dimondr",
+			repoErr: fmt.Errorf("%w: name already registered", models.ErrConflict),
+		},
 		{
 			name:      "empty name",
 			item:      models.Item{Name: "  "},

@@ -28,12 +28,12 @@ func initRepo(t *testing.T) *ItemRepo {
 	t.Cleanup(pool.Close)
 	err = pool.Ping(ctx)
 	if err != nil {
-		t.Fatalf("failed to connect to db: %v", err)
+		t.Fatalf("connect to db: %v", err)
 	}
 	repo := New(pool)
 	_, err = repo.pool.Exec(ctx, `TRUNCATE items RESTART IDENTITY`)
 	if err != nil {
-		t.Fatalf("failed to truncate table: %v", err)
+		t.Fatalf("truncate table: %v", err)
 	}
 	_, err = repo.pool.Exec(ctx, `INSERT INTO items (name) VALUES ($1), ($2)`, "prvi", "drugi")
 	if err != nil {
