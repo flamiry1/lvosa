@@ -9,7 +9,7 @@ import (
 )
 
 type ItemService struct {
-	repo ItemRepository
+	itemsRepo ItemRepository
 }
 
 type ItemRepository interface {
@@ -21,7 +21,7 @@ type ItemRepository interface {
 }
 
 func New(s ItemRepository) *ItemService {
-	return &ItemService{repo: s}
+	return &ItemService{itemsRepo: s}
 }
 
 func checkNameLength(name string) (string, bool) {
@@ -34,11 +34,11 @@ func checkNameLength(name string) (string, bool) {
 }
 
 func (s *ItemService) List(ctx context.Context) ([]models.Item, error) {
-	return s.repo.All(ctx)
+	return s.itemsRepo.All(ctx)
 }
 
 func (s *ItemService) Get(ctx context.Context, id int) (models.Item, error) {
-	return s.repo.Find(ctx, id)
+	return s.itemsRepo.Find(ctx, id)
 }
 
 func (s *ItemService) Create(ctx context.Context, item models.Item) (models.Item, error) {
@@ -47,7 +47,7 @@ func (s *ItemService) Create(ctx context.Context, item models.Item) (models.Item
 		return models.Item{}, fmt.Errorf("%w: length should be in 1 - 100", models.ErrBadRequest)
 	}
 	item.Name = name
-	item, err := s.repo.Create(ctx, item)
+	item, err := s.itemsRepo.Create(ctx, item)
 	if err != nil {
 		return models.Item{}, err
 	}
@@ -60,9 +60,9 @@ func (s *ItemService) Update(ctx context.Context, item models.Item, id int) erro
 		return fmt.Errorf("%w: length should be in 1 - 100", models.ErrBadRequest)
 	}
 	item.Name = name
-	return s.repo.Update(ctx, id, item)
+	return s.itemsRepo.Update(ctx, id, item)
 }
 
 func (s *ItemService) Delete(ctx context.Context, id int) error {
-	return s.repo.Delete(ctx, id)
+	return s.itemsRepo.Delete(ctx, id)
 }

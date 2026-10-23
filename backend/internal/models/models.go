@@ -32,3 +32,5 @@ var ErrNotFound = errors.New("not found")
 var ErrConflict = errors.New("conflict error")
 
 var ErrInvalidCredentials = errors.New("wrong email or password")
+
+var ErrUnauthorized = errors.New("unauthorized")

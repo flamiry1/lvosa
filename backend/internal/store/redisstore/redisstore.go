@@ -7,11 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"lvosa/backend/internal/models"
+	"lvosa/backend/internal/service"
 	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
+
+var _ service.SessionRepository = (*SessionRepo)(nil)
 
 type SessionRepo struct {
 	client *redis.Client
