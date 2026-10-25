@@ -24,8 +24,8 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	h := New(srv)
 	h.RegisterRouters(r)
 	return r
-
 }
+
 func doRequest(t *testing.T, r *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))

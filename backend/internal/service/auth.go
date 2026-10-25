@@ -67,7 +67,6 @@ func (a *AuthService) Register(ctx context.Context, email, password string) (mod
 	user, err := a.usersRepo.Create(ctx, models.User{Email: checkedEmail, PasswordHash: string(hashedPassword), Role: models.RoleStudent})
 	if err != nil {
 		return models.User{}, fmt.Errorf("register user: %w", err)
-
 	}
 	return user, nil
 }

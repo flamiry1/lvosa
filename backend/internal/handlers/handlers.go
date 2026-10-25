@@ -33,6 +33,10 @@ func handleError(err error, c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"status": "conflict"})
 		return
 	}
+	if errors.Is(err, models.ErrInvalidCredentials) {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
+		return
+	}
 	slog.Error("internal error", "err", err)
 	c.JSON(http.StatusInternalServerError, gin.H{"status": "internal server error"})
 }
@@ -46,12 +50,11 @@ func New(s Service) *Handler {
 }
 
 func (h *Handler) RegisterRouters(r *gin.Engine) {
-	r.GET("/item/:id", h.getItem)
 	r.POST("/item", h.createItem)
+	r.GET("/item/:id", h.getItem)
 	r.GET("/items", h.allItems)
 	r.PUT("/item/:id", h.updateItem)
 	r.DELETE("/item/:id", h.deleteItem)
-	// r.GET("/person", h.getPerson)
 }
 
 func (h *Handler) getItem(c *gin.Context) {
