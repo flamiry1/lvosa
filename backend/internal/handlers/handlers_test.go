@@ -26,11 +26,14 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	return r
 }
 
-func doRequest(t *testing.T, r *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
+func doRequest(t *testing.T, r *gin.Engine, method, path, body, token string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		setCookie(t, token, req)
 	}
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -66,12 +69,12 @@ func TestHandlers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := newTestRouter(t)
 			for _, item := range test.seed {
-				rec := doRequest(t, r, http.MethodPost, "/item", `{"name": "`+item+`"}`)
+				rec := doRequest(t, r, http.MethodPost, "/item", `{"name": "`+item+`"}`, "")
 				if rec.Code != http.StatusCreated {
 					t.Fatalf("seed %q:, status = %d, want %d", item, rec.Code, http.StatusCreated)
 				}
 			}
-			rec := doRequest(t, r, test.method, test.path, test.body)
+			rec := doRequest(t, r, test.method, test.path, test.body, "")
 			if rec.Code != test.wantStatus {
 				t.Fatalf("expected status = %d, received %d", test.wantStatus, rec.Code)
 			}
@@ -97,7 +100,7 @@ func TestServiceHandlers(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			rec := doRequest(t, r, http.MethodGet, test.path, "")
+			rec := doRequest(t, r, http.MethodGet, test.path, "", "")
 			if rec.Code != test.wantCode {
 				t.Fatalf("unexpected status = %d, body %q", rec.Code, rec.Body.String())
 			}

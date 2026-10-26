@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const sessionKey string = "session"
+
 type Authenticator interface {
 	Register(ctx context.Context, email, password string) (models.User, error)
 	Login(ctx context.Context, email, password string) (models.User, string, error)
@@ -35,6 +37,13 @@ func NewAuthHandler(a Authenticator, ttl time.Duration, s bool) *AuthHandler {
 func (a *AuthHandler) RegisterRouters(r *gin.Engine) {
 	r.POST("/register", a.register)
 	r.POST("/login", a.login)
+	r.POST("/logout", a.logout)
+	r.GET("/me", a.currentUser)
+}
+
+func (a *AuthHandler) setCookieSession(c *gin.Context, value string, ttl int) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(sessionKey, value, ttl, "/", "", a.secure, true)
 }
 
 func (a *AuthHandler) register(c *gin.Context) {
@@ -68,7 +77,38 @@ func (a *AuthHandler) login(c *gin.Context) {
 		handleError(err, c)
 		return
 	}
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("session", token, int(a.ttlCookie/time.Second), "/", "", a.secure, true)
+	a.setCookieSession(c, token, int(a.ttlCookie/time.Second))
+	c.JSON(http.StatusOK, user)
+}
+
+func (a *AuthHandler) logout(c *gin.Context) {
+	session, err := c.Cookie(sessionKey)
+	if err != nil {
+		a.setCookieSession(c, "", -1)
+		c.Status(http.StatusNoContent)
+		return
+	}
+	ctx := c.Request.Context()
+	err = a.auth.Logout(ctx, session)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
+	a.setCookieSession(c, "", -1)
+	c.Status(http.StatusNoContent)
+}
+
+func (a *AuthHandler) currentUser(c *gin.Context) {
+	session, err := c.Cookie(sessionKey)
+	if err != nil {
+		handleError(models.ErrUnauthorized, c)
+		return
+	}
+	ctx := c.Request.Context()
+	user, err := a.auth.CurrentUser(ctx, session)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
 	c.JSON(http.StatusOK, user)
 }

@@ -26,15 +26,19 @@ func handleError(err error, c *gin.Context) {
 		return
 	}
 	if errors.Is(err, models.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"status": "not found"})
+		c.JSON(http.StatusNotFound, gin.H{"status": models.ErrNotFound.Error()})
 		return
 	}
 	if errors.Is(err, models.ErrConflict) {
-		c.JSON(http.StatusConflict, gin.H{"status": "conflict"})
+		c.JSON(http.StatusConflict, gin.H{"status": models.ErrConflict.Error()})
 		return
 	}
 	if errors.Is(err, models.ErrInvalidCredentials) {
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"status": models.ErrInvalidCredentials.Error()})
+		return
+	}
+	if errors.Is(err, models.ErrUnauthorized) {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": models.ErrUnauthorized.Error()})
 		return
 	}
 	slog.Error("internal error", "err", err)

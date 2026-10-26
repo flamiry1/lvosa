@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"lvosa/backend/internal/models"
 	"net/http"
 	"strings"
@@ -14,7 +14,7 @@ import (
 
 var _ Authenticator = (*fakeAuthenticator)(nil)
 
-const cookieName string = "session"
+var serviceErr error = errors.New("all is down")
 
 type fakeAuthenticator struct {
 	returnUser               models.User
@@ -27,17 +27,31 @@ type fakeAuthenticator struct {
 	loginReceivedEmail       string
 	loginReceivedPassword    string
 	loginReturnToken         string
+	logoutCalls              int
+	logoutErr                error
+	logoutReceivedToken      string
+	currentUserCalls         int
+	currentUserErr           error
+	currentUserReceivedToken string
 }
 
 func newAuthTestRouter(t *testing.T) (*gin.Engine, *fakeAuthenticator, *AuthHandler) {
 	fakeAuth := &fakeAuthenticator{}
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	srv := NewAuthHandler(fakeAuth, 5*time.Minute, false)
+	authHandler := NewAuthHandler(fakeAuth, 5*time.Minute, false)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	srv.RegisterRouters(r)
-	return r, fakeAuth, srv
+	authHandler.RegisterRouters(r)
+	return r, fakeAuth, authHandler
+}
+
+func setCookie(t *testing.T, token string, req *http.Request) {
+	c1 := &http.Cookie{Name: "lang", Value: "ru"}
+	c2 := &http.Cookie{Name: sessionKey, Value: token}
+	t.Helper()
+	req.AddCookie(c1)
+	req.AddCookie(c2)
 }
 
 func (f *fakeAuthenticator) Register(ctx context.Context, email, password string) (models.User, error) {
@@ -61,11 +75,21 @@ func (f *fakeAuthenticator) Login(ctx context.Context, email, password string) (
 }
 
 func (f *fakeAuthenticator) Logout(ctx context.Context, token string) error {
+	f.logoutCalls++
+	f.logoutReceivedToken = token
+	if f.logoutErr != nil {
+		return f.logoutErr
+	}
 	return nil
 }
 
 func (f *fakeAuthenticator) CurrentUser(ctx context.Context, token string) (models.User, error) {
-	return models.User{}, nil
+	f.currentUserCalls++
+	f.currentUserReceivedToken = token
+	if f.currentUserErr != nil {
+		return models.User{}, f.currentUserErr
+	}
+	return f.returnUser, nil
 }
 
 func TestAuthRegister(t *testing.T) {
@@ -88,7 +112,7 @@ func TestAuthRegister(t *testing.T) {
 			router, fakeAuth, _ := newAuthTestRouter(t)
 			fakeAuth.registerErr = test.serviceErr
 			fakeAuth.returnUser = models.User{Email: "dima@mail.com", PasswordHash: "secret-hash-value"}
-			rec := doRequest(t, router, http.MethodPost, "/register", test.body)
+			rec := doRequest(t, router, http.MethodPost, "/register", test.body, "")
 			if rec.Code != test.wantCode {
 				t.Fatalf("expected status %d, received: %d", test.wantCode, rec.Code)
 			}
@@ -114,7 +138,6 @@ func TestAuthRegister(t *testing.T) {
 }
 
 func TestAuthLogin(t *testing.T) {
-	serviceErr := fmt.Errorf("all is down")
 	tests := []struct {
 		name                  string
 		body                  string
@@ -126,7 +149,7 @@ func TestAuthLogin(t *testing.T) {
 		serviceErr            error
 	}{
 		{name: "valid log in", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusOK, serviceErr: nil},
-		{name: "invalid log in: invalid creds", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusUnauthorized, serviceErr: models.ErrInvalidCredentials, wantBody: `{"status":"unauthorized"}`},
+		{name: "invalid log in: invalid creds", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusUnauthorized, serviceErr: models.ErrInvalidCredentials, wantBody: `{"status":"wrong email or password"}`},
 		{name: "invalid log in: service error", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusInternalServerError, serviceErr: serviceErr, wantBody: `{"status":"internal server error"}`},
 		{name: "invalid log in: no password in body", body: `{"email":"dima@mail.com"}`, wantServiceLoginCalls: 0, wantEmail: "", wantPassword: "", wantCode: http.StatusBadRequest, serviceErr: nil},
 	}
@@ -136,7 +159,7 @@ func TestAuthLogin(t *testing.T) {
 			fakeAuth.loginErr = test.serviceErr
 			fakeAuth.loginReturnToken = "test-secret-token"
 			fakeAuth.returnUser = models.User{Email: "dima@mail.com", PasswordHash: "secret-hash-value"}
-			rec := doRequest(t, router, http.MethodPost, "/login", test.body)
+			rec := doRequest(t, router, http.MethodPost, "/login", test.body, "")
 			if rec.Code != test.wantCode {
 				t.Fatalf("expected status %d, received: %d", test.wantCode, rec.Code)
 			}
@@ -174,8 +197,8 @@ func TestAuthLogin(t *testing.T) {
 				if cookies.Value != fakeAuth.loginReturnToken {
 					t.Fatalf("expected session token: %s, received: %s", fakeAuth.loginReturnToken, cookies.Value)
 				}
-				if cookies.Name != cookieName {
-					t.Fatalf("expected cookie name: %s, received: %s", cookieName, cookies.Name)
+				if cookies.Name != sessionKey {
+					t.Fatalf("expected cookie name: %s, received: %s", sessionKey, cookies.Name)
 				}
 			} else {
 				if len(rec.Result().Cookies()) > 0 {
@@ -190,6 +213,108 @@ func TestAuthLogin(t *testing.T) {
 			}
 			if fakeAuth.loginReceivedPassword != test.wantPassword {
 				t.Fatalf("expected password: %s, received: %s", test.wantPassword, fakeAuth.loginReceivedPassword)
+			}
+		})
+	}
+}
+
+func TestAuthLogout(t *testing.T) {
+	tests := []struct {
+		name            string
+		wantLogoutCalls int
+		wantCode        int
+		wantToken       string
+		wantBody        string
+		cookieToken     string
+		serviceErr      error
+	}{
+		{name: "valid log out: token", wantLogoutCalls: 1, wantCode: http.StatusNoContent, wantToken: "test-secret-token", cookieToken: "test-secret-token", serviceErr: nil, wantBody: ""},
+		{name: "valid log out: no token", wantLogoutCalls: 0, wantCode: http.StatusNoContent, wantToken: "", cookieToken: "", serviceErr: nil, wantBody: ""},
+		{name: "invalid log out: service error", wantLogoutCalls: 1, wantCode: http.StatusInternalServerError, wantToken: "test-secret-token", cookieToken: "test-secret-token", serviceErr: serviceErr, wantBody: `{"status":"internal server error"}`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			router, fakeAuth, _ := newAuthTestRouter(t)
+			fakeAuth.logoutErr = test.serviceErr
+			rec := doRequest(t, router, http.MethodPost, "/logout", "", test.cookieToken)
+			if rec.Code != test.wantCode {
+				t.Fatalf("expected status %d, received: %d", test.wantCode, rec.Code)
+			}
+			if rec.Code == http.StatusNoContent {
+				if len(rec.Result().Cookies()) == 0 {
+					t.Fatalf("logout did not clear the session cookie")
+				}
+				cookies := rec.Result().Cookies()[0]
+				if cookies.Name != sessionKey {
+					t.Fatalf("expected name: %s, received: %s", sessionKey, cookies.Name)
+				}
+				if cookies.Value != "" {
+					t.Fatalf("expected empty token, received: %s", cookies.Value)
+				}
+				if cookies.MaxAge != -1 {
+					t.Fatalf("expected MaxAge -1, received: %d", cookies.MaxAge)
+				}
+			}
+			if test.serviceErr != nil {
+				if rec.Body.String() != test.wantBody {
+					t.Fatalf("expected body: %v, received: %v", test.wantBody, rec.Body.String())
+				}
+			}
+			if fakeAuth.logoutCalls != test.wantLogoutCalls {
+				t.Fatalf("expected logoutCalls: %d, received: %d", test.wantLogoutCalls, fakeAuth.logoutCalls)
+			}
+			if fakeAuth.logoutReceivedToken != test.wantToken {
+				t.Fatalf("expected token: %s, received: %s", test.wantToken, fakeAuth.logoutReceivedToken)
+			}
+		})
+	}
+}
+
+func TestAuthCurrentUser(t *testing.T) {
+	tests := []struct {
+		name                 string
+		wantCurrentUserCalls int
+		wantCode             int
+		wantToken            string
+		wantBody             string
+		cookieToken          string
+		serviceErr           error
+	}{
+		{name: "valid current user", wantCurrentUserCalls: 1, wantCode: http.StatusOK, wantToken: "test-secret-token", cookieToken: "test-secret-token", serviceErr: nil, wantBody: ""},
+		{name: "invalid current user: no token in cookies", wantCurrentUserCalls: 0, wantCode: http.StatusUnauthorized, wantToken: "", cookieToken: "", serviceErr: nil, wantBody: ""},
+		{name: "invalid current user: unauthorized", wantCurrentUserCalls: 1, wantCode: http.StatusUnauthorized, wantToken: "test-secret-token", cookieToken: "test-secret-token", serviceErr: models.ErrUnauthorized, wantBody: `{"status":"unauthorized"}`},
+		{name: "invalid current user: service error", wantCurrentUserCalls: 1, wantCode: http.StatusInternalServerError, wantToken: "test-secret-token", cookieToken: "test-secret-token", serviceErr: serviceErr, wantBody: `{"status":"internal server error"}`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			router, fakeAuth, _ := newAuthTestRouter(t)
+			fakeAuth.currentUserErr = test.serviceErr
+			fakeAuth.returnUser = models.User{Email: "dima@mail.com", PasswordHash: "secret-hash-value"}
+			rec := doRequest(t, router, http.MethodGet, "/me", "", test.cookieToken)
+			if rec.Code != test.wantCode {
+				t.Fatalf("expected status %d, received: %d", test.wantCode, rec.Code)
+			}
+			if test.serviceErr != nil {
+				if rec.Body.String() != test.wantBody {
+					t.Fatalf("expected body: %v, received: %v", test.wantBody, rec.Body.String())
+				}
+			}
+			if rec.Code == http.StatusOK {
+				if strings.Contains(rec.Body.String(), "secret-hash-value") {
+					t.Fatalf("unexpectedly return hash")
+				}
+				if strings.Contains(rec.Body.String(), "test-secret-token") {
+					t.Fatalf("unexpectedly return token")
+				}
+				if !strings.Contains(rec.Body.String(), "dima@mail.com") {
+					t.Fatalf("body doesn't contain email: %s", "dima@mail.com")
+				}
+			}
+			if fakeAuth.currentUserCalls != test.wantCurrentUserCalls {
+				t.Fatalf("expected currentUserCalls: %d, received: %d", test.wantCurrentUserCalls, fakeAuth.currentUserCalls)
+			}
+			if fakeAuth.currentUserReceivedToken != test.wantToken {
+				t.Fatalf("expected token: %s, received: %s", test.wantToken, fakeAuth.currentUserReceivedToken)
 			}
 		})
 	}
