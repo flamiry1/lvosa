@@ -18,10 +18,10 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	s := store.New()
-	srv := service.New(s)
+	srv := service.NewItemService(s)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	h := New(srv)
+	h := NewItemHandler(srv)
 	h.RegisterRouters(r)
 	return r
 }
@@ -87,7 +87,7 @@ func TestServiceHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	h := New(fake)
+	h := NewItemHandler(fake)
 	h.RegisterRouters(r)
 	tests := []struct {
 		name        string

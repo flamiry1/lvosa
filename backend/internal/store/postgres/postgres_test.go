@@ -30,7 +30,7 @@ func initRepo(t *testing.T) *ItemRepo {
 	if err != nil {
 		t.Fatalf("connect to db: %v", err)
 	}
-	repo := New(pool)
+	repo := NewItemRepo(pool)
 	_, err = repo.pool.Exec(ctx, `TRUNCATE items RESTART IDENTITY`)
 	if err != nil {
 		t.Fatalf("truncate table: %v", err)

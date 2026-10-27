@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"lvosa/backend/internal/service"
-	"lvosa/backend/internal/store/postgres"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,10 +12,8 @@ import (
 	"time"
 
 	"lvosa/backend/internal/config"
-	"lvosa/backend/internal/handlers"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
@@ -32,34 +28,22 @@ func run() error {
 	gin.SetMode(cfg.GinMode)
 	startCtx, startCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer startCancel()
-	pool, err := pgxpool.New(startCtx, cfg.PostgresDSN)
+	pool, err := postgresConnect(startCtx, cfg.PostgresDSN)
 	if err != nil {
-		return fmt.Errorf("parse postgres dsn: %w", err)
+		return err
 	}
 	defer pool.Close()
-	err = pool.Ping(startCtx)
-	if err != nil {
-		return fmt.Errorf("ping postgres: %w", err)
-	}
 	slog.Info("postgres connected")
-
-	opts, err := redis.ParseURL(cfg.RedisDSN)
+	redisClient, err := redisConnect(startCtx, cfg.RedisDSN)
 	if err != nil {
-		return fmt.Errorf("parse redis url: %w", err)
+		return err
 	}
-	client := redis.NewClient(opts)
-	defer client.Close()
-	status := client.Ping(startCtx)
-	if status.Err() != nil {
-		return fmt.Errorf("ping redis: %w", status.Err())
-	}
+	defer redisClient.Close()
 	slog.Info("redis connected")
-	repo := postgres.New(pool)
-	sr := service.New(repo)
-	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
-	h := handlers.New(sr)
-	h.RegisterRouters(r)
+	r, err := newRouter(pool, redisClient, &cfg)
+	if err != nil {
+		return err
+	}
 	srv := &http.Server{
 		Addr:         cfg.Port,
 		Handler:      r,

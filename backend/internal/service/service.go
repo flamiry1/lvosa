@@ -20,7 +20,7 @@ type ItemRepository interface {
 	Delete(ctx context.Context, id int) error
 }
 
-func New(s ItemRepository) *ItemService {
+func NewItemService(s ItemRepository) *ItemService {
 	return &ItemService{itemsRepo: s}
 }
 

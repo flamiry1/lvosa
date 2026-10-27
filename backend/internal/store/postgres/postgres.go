@@ -23,7 +23,7 @@ const (
 	uniqueViolation string = "23505"
 )
 
-func New(p *pgxpool.Pool) *ItemRepo {
+func NewItemRepo(p *pgxpool.Pool) *ItemRepo {
 	return &ItemRepo{pool: p}
 }
 

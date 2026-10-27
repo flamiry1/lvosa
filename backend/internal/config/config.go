@@ -19,18 +19,19 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	PostgresDSN     string
 	RedisDSN        string
+	SessionTTL      time.Duration
+	Secure          bool
 }
 
-func getDuration(n string) (time.Duration, error) {
+func getDuration(n string, def time.Duration) (time.Duration, error) {
 	t := os.Getenv(n)
 	if t == "" {
-		return 10 * time.Second, nil
+		return def, nil
 	}
 	v, err := time.ParseDuration(t)
 	if err != nil {
 		return 0, fmt.Errorf("wrong format for %s: %w", n, err)
 	}
-
 	return v, nil
 }
 
@@ -52,17 +53,18 @@ func Load() (Config, error) {
 	} else {
 		return Config{}, fmt.Errorf("wrong port %v", p)
 	}
-	if l := strings.ToLower(os.Getenv("LOG_LEVEL")); l == "" || l == "debug" {
+	if level := strings.ToLower(os.Getenv("LOG_LEVEL")); level == "" || level == "debug" {
 		cfg.Slog = slog.LevelDebug
 	} else {
-		if l == "info" {
+		switch level {
+		case "info":
 			cfg.Slog = slog.LevelInfo
-		} else if l == "warn" {
+		case "warn":
 			cfg.Slog = slog.LevelWarn
-		} else if l == "error" {
+		case "error":
 			cfg.Slog = slog.LevelError
-		} else {
-			return Config{}, fmt.Errorf("wrong level: %v", l)
+		default:
+			return Config{}, fmt.Errorf("wrong level: %v", level)
 		}
 	}
 	if appEnv := os.Getenv("APP_ENV"); appEnv == "" {
@@ -74,21 +76,35 @@ func Load() (Config, error) {
 	} else {
 		return Config{}, fmt.Errorf("wrong APP_ENV: %v", appEnv)
 	}
-	cfg.WriteTimeout, err = getDuration("WRITE_TIMEOUT")
+	cfg.WriteTimeout, err = getDuration("WRITE_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.ReadTimeout, err = getDuration("READ_TIMEOUT")
+	cfg.ReadTimeout, err = getDuration("READ_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.IdleTimeout, err = getDuration("IDLE_TIMEOUT")
+	cfg.IdleTimeout, err = getDuration("IDLE_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.ShutdownTimeout, err = getDuration("SHUTDOWN_TIMEOUT")
+	cfg.ShutdownTimeout, err = getDuration("SHUTDOWN_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
+	}
+	cfg.SessionTTL, err = getDuration("SESSION_TTL", 168*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	secure := os.Getenv("COOKIE_SECURE")
+	if secure == "" {
+		cfg.Secure = false
+	} else {
+		parsedSecure, err := strconv.ParseBool(secure)
+		if err != nil {
+			return Config{}, fmt.Errorf("wrong format for COOKIE_SECURE: %v", err)
+		}
+		cfg.Secure = parsedSecure
 	}
 	return cfg, nil
 }

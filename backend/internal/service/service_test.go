@@ -85,7 +85,7 @@ func TestCreate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fake := &fakeRepo{err: test.repoErr}
-			svc := New(fake)
+			svc := NewItemService(fake)
 			_, err := svc.Create(context.Background(), test.item)
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("expected error: %v, received error: %v", test.wantErr, err)
@@ -124,7 +124,7 @@ func TestUpdate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fake := &fakeRepo{err: test.repoErr}
-			svc := New(fake)
+			svc := NewItemService(fake)
 			err := svc.Update(context.Background(), test.item, test.id)
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("expected error: %v, received error: %v", test.wantErr, err)
@@ -156,7 +156,7 @@ func TestServiceList(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fake := &fakeRepo{err: test.repoErr}
-			s := New(fake)
+			s := NewItemService(fake)
 			_, err := s.List(context.Background())
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("unexpected error %v, want %v", err, test.wantErr)

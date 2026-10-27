@@ -49,7 +49,7 @@ type Handler struct {
 	svc Service
 }
 
-func New(s Service) *Handler {
+func NewItemHandler(s Service) *Handler {
 	return &Handler{svc: s}
 }
 
