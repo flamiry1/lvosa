@@ -52,9 +52,9 @@ func newRouter(p *pgxpool.Pool, rdb *redis.Client, c *config.Config) (*gin.Engin
 	}
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
-	itemsHandler := handlers.NewItemHandler(itemService)
-	itemsHandler.RegisterRouters(r)
 	authHandler := handlers.NewAuthHandler(authService, c.SessionTTL, c.Secure)
 	authHandler.RegisterRouters(r)
+	itemsHandler := handlers.NewItemHandler(itemService)
+	itemsHandler.RegisterRouters(r, authHandler.AuthMiddleware())
 	return r, nil
 }

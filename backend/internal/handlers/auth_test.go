@@ -319,3 +319,72 @@ func TestAuthCurrentUser(t *testing.T) {
 		})
 	}
 }
+
+func TestMiddleware(t *testing.T) {
+
+	tests := []struct {
+		name                 string
+		email                string
+		wantEmail            string
+		wantCode             int
+		wantHandleCalled     bool
+		wantCurrentUserCalls int
+		wantBody             string
+		serviceErr           error
+		cookieToken          string
+		wantToken            string
+	}{
+		{name: "valid entering", email: "dima@gmail.com", wantCode: http.StatusOK, wantHandleCalled: true, wantCurrentUserCalls: 1, wantBody: "", cookieToken: "test-secret-token", wantToken: "test-secret-token", serviceErr: nil},
+		{name: "invalid entering: no cookies", email: "dima@gmail.com", wantCode: http.StatusUnauthorized, wantHandleCalled: false, wantCurrentUserCalls: 0, wantBody: "", cookieToken: "", wantToken: "", serviceErr: nil},
+		{name: "invalid entering: service return unauthorized", email: "dima@gmail.com", wantCode: http.StatusUnauthorized, wantHandleCalled: false, wantCurrentUserCalls: 1, wantBody: `{"status":"unauthorized"}`, cookieToken: "test-secret-token", wantToken: "test-secret-token", serviceErr: models.ErrUnauthorized},
+		{name: "invalid entering: internal server error", email: "dima@gmail.com", wantCode: http.StatusInternalServerError, wantHandleCalled: false, wantCurrentUserCalls: 1, wantBody: `{"status":"internal server error"}`, cookieToken: "test-secret-token", wantToken: "test-secret-token", serviceErr: serviceErr},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handleCalled := false
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			fakeAuth := &fakeAuthenticator{returnUser: models.User{Email: "dima@gmail.com", PasswordHash: "secret-hash-value"}}
+			fakeAuth.currentUserErr = test.serviceErr
+			authHandler := NewAuthHandler(fakeAuth, 5*time.Minute, false)
+			router.Use(gin.Recovery())
+			router.GET("/protected", authHandler.AuthMiddleware(), func(c *gin.Context) {
+				handleCalled = true
+				user, err := getUserFromContext(c)
+				if err != nil {
+					return
+				}
+				c.JSON(http.StatusOK, user)
+			})
+			rec := doRequest(t, router, http.MethodGet, "/protected", "", test.cookieToken)
+			if rec.Code != test.wantCode {
+				t.Fatalf("expected status %d, received: %d", test.wantCode, rec.Code)
+			}
+			if rec.Code == http.StatusOK {
+				if strings.Contains(rec.Body.String(), "secret-hash-value") {
+					t.Fatalf("unexpectedly return hash")
+				}
+				if strings.Contains(rec.Body.String(), "test-secret-token") {
+					t.Fatalf("unexpectedly return token")
+				}
+				if !strings.Contains(rec.Body.String(), "dima@gmail.com") {
+					t.Fatalf("body doesn't contain email: %s", "dima@mail.com")
+				}
+			}
+			if test.serviceErr != nil {
+				if rec.Body.String() != test.wantBody {
+					t.Fatalf("expected body: %v, received: %v", test.wantBody, rec.Body.String())
+				}
+			}
+			if handleCalled != test.wantHandleCalled {
+				t.Fatalf("expected handle be called, received: %v", handleCalled)
+			}
+			if fakeAuth.currentUserCalls != test.wantCurrentUserCalls {
+				t.Fatalf("expected currentUserCalls: %d, received: %d", test.wantCurrentUserCalls, fakeAuth.currentUserCalls)
+			}
+			if fakeAuth.currentUserReceivedToken != test.wantToken {
+				t.Fatalf("expected token: %s, received: %s", test.wantToken, fakeAuth.currentUserReceivedToken)
+			}
+		})
+	}
+}

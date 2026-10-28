@@ -11,6 +11,7 @@ import (
 )
 
 const sessionKey string = "session"
+const userCtxKey string = "currentUser"
 
 type Authenticator interface {
 	Register(ctx context.Context, email, password string) (models.User, error)
@@ -38,12 +39,44 @@ func (a *AuthHandler) RegisterRouters(r *gin.Engine) {
 	r.POST("/register", a.register)
 	r.POST("/login", a.login)
 	r.POST("/logout", a.logout)
-	r.GET("/me", a.currentUser)
+	r.GET("/me", a.AuthMiddleware(), a.currentUser)
+}
+
+func (a *AuthHandler) AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		sessionToken, err := c.Cookie(sessionKey)
+		if err != nil {
+			handleError(models.ErrUnauthorized, c)
+			c.Abort()
+			return
+		}
+		ctx := c.Request.Context()
+		user, err := a.auth.CurrentUser(ctx, sessionToken)
+		if err != nil {
+			handleError(err, c)
+			c.Abort()
+			return
+		}
+		c.Set(userCtxKey, user)
+		c.Next()
+	}
 }
 
 func (a *AuthHandler) setCookieSession(c *gin.Context, value string, ttl int) {
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(sessionKey, value, ttl, "/", "", a.secure, true)
+}
+
+func getUserFromContext(c *gin.Context) (models.User, error) {
+	rawUser, exists := c.Get(userCtxKey)
+	if !exists {
+		return models.User{}, models.ErrUnauthorized
+	}
+	user, ok := rawUser.(models.User)
+	if !ok {
+		return models.User{}, fmt.Errorf("couldnt find user")
+	}
+	return user, nil
 }
 
 func (a *AuthHandler) register(c *gin.Context) {
@@ -99,13 +132,7 @@ func (a *AuthHandler) logout(c *gin.Context) {
 }
 
 func (a *AuthHandler) currentUser(c *gin.Context) {
-	session, err := c.Cookie(sessionKey)
-	if err != nil {
-		handleError(models.ErrUnauthorized, c)
-		return
-	}
-	ctx := c.Request.Context()
-	user, err := a.auth.CurrentUser(ctx, session)
+	user, err := getUserFromContext(c)
 	if err != nil {
 		handleError(err, c)
 		return

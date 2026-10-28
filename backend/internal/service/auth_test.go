@@ -129,13 +129,16 @@ func TestAuthService_Register(t *testing.T) {
 				t.Fatalf("unexpected email %q, should be %q", user.Email, test.wantEmail)
 			}
 			if test.password != "" && test.wantErr == nil {
-				err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(test.password))
+				err = bcrypt.CompareHashAndPassword([]byte(fakeURepo.saveUser.PasswordHash), []byte(test.password))
 				if err != nil {
 					t.Fatalf("different hashed password and password: %v", err)
 				}
 				if user.Role != models.RoleStudent {
 					t.Fatalf("expected role: %q, received: %q", models.RoleStudent, user.Role)
 				}
+			}
+			if user.PasswordHash != "" {
+				t.Fatalf("expected empty hash password, received: %s", user.PasswordHash)
 			}
 			if fakeURepo.createCalls != test.wantCalls {
 				t.Fatalf("repo calls = %d, should be %d", fakeURepo.createCalls, test.wantCalls)
@@ -188,11 +191,8 @@ func TestAuthService_Login(t *testing.T) {
 			if user.Email != test.wantEmail {
 				t.Fatalf("unexpected email %q, should be %q", user.Email, test.wantEmail)
 			}
-			if test.password != "" && test.wantErr == nil {
-				err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(test.password))
-				if err != nil {
-					t.Fatalf("different hashed password and password: %v", err)
-				}
+			if user.PasswordHash != "" {
+				t.Fatalf("expected empty hash password, received: %s", user.PasswordHash)
 			}
 			if fakeURepo.findByEmailCalls != test.findByEmailWantCalls {
 				t.Fatalf("users repo calls = %d, should be %d", fakeURepo.findByEmailCalls, test.findByEmailWantCalls)
@@ -259,10 +259,14 @@ func TestAuthService_CurrentUser(t *testing.T) {
 		{name: "redis error", token: "test-token", findByIDErr: nil, wantErr: rDBErr, wantFindIDByCalls: 0, wantUserID: 0, getErr: rDBErr},
 		{name: "postgre error", token: "test-token", findByIDErr: dbErr, wantErr: dbErr, wantFindIDByCalls: 1, wantUserID: 0, getErr: nil},
 	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("create a user: %v", err)
+	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeSRepo := &fakeSessionRepo{returnUserID: 77, errGet: test.getErr}
-			fakeURepo := &fakeUserRepo{returnUser: models.User{ID: 77, Email: "dimas@bog.mail"}, errFindByID: test.findByIDErr}
+			fakeURepo := &fakeUserRepo{returnUser: models.User{ID: 77, Email: "dimas@bog.mail", PasswordHash: string(hashedPassword)}, errFindByID: test.findByIDErr}
 			srv, err := NewAuthService(fakeURepo, fakeSRepo)
 			if err != nil {
 				t.Fatalf("create service: %v", err)
@@ -273,6 +277,9 @@ func TestAuthService_CurrentUser(t *testing.T) {
 			}
 			if user.ID != test.wantUserID {
 				t.Fatalf("expected ID: %d, received: %d", test.wantUserID, user.ID)
+			}
+			if user.PasswordHash != "" {
+				t.Fatalf("expected empty hash password, received: %s", user.PasswordHash)
 			}
 			if fakeSRepo.getToken != test.token {
 				t.Fatalf("expected token: %s, received: %s", test.token, fakeSRepo.getToken)

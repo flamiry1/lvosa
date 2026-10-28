@@ -53,12 +53,15 @@ func NewItemHandler(s Service) *Handler {
 	return &Handler{svc: s}
 }
 
-func (h *Handler) RegisterRouters(r *gin.Engine) {
-	r.POST("/item", h.createItem)
+func (h *Handler) RegisterRouters(r *gin.Engine, m gin.HandlerFunc) {
+	authProtected := r.Group("", m)
+	{
+		authProtected.POST("/item", h.createItem)
+		authProtected.PUT("/item/:id", h.updateItem)
+		authProtected.DELETE("/item/:id", h.deleteItem)
+	}
 	r.GET("/item/:id", h.getItem)
 	r.GET("/items", h.allItems)
-	r.PUT("/item/:id", h.updateItem)
-	r.DELETE("/item/:id", h.deleteItem)
 }
 
 func (h *Handler) getItem(c *gin.Context) {

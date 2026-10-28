@@ -68,6 +68,7 @@ func (a *AuthService) Register(ctx context.Context, email, password string) (mod
 	if err != nil {
 		return models.User{}, fmt.Errorf("register user: %w", err)
 	}
+	user.PasswordHash = ""
 	return user, nil
 }
 
@@ -88,6 +89,7 @@ func (a *AuthService) Login(ctx context.Context, email, password string) (models
 	if err != nil {
 		return models.User{}, "", models.ErrInvalidCredentials
 	}
+	user.PasswordHash = ""
 	token, err := a.sessionRepo.Create(ctx, user.ID)
 	if err != nil {
 		return models.User{}, "", fmt.Errorf("create session: %w", err)
@@ -118,5 +120,6 @@ func (a *AuthService) CurrentUser(ctx context.Context, token string) (models.Use
 		}
 		return models.User{}, fmt.Errorf("get user by ID: %w", err)
 	}
+	user.PasswordHash = ""
 	return user, nil
 }
