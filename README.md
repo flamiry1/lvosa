@@ -103,7 +103,7 @@ frontend/                Nuxt app (planned)
 - [x] Layered HTTP API with tests
 - [x] Postgres storage and migrations
 - [x] Redis connection
-- [ ] Authentication: registration, login, sessions, roles
+- [x] Authentication: registration, login, sessions, roles
 - [ ] Lessons and exercises
 - [ ] Frontend
 - [ ] AI tutor
