@@ -34,3 +34,7 @@ var ErrConflict = errors.New("conflict error")
 var ErrInvalidCredentials = errors.New("wrong email or password")
 
 var ErrUnauthorized = errors.New("unauthorized")
+
+var ErrForbidden = errors.New("forbidden")
+
+var ErrNoUserFound = errors.New("no user found")

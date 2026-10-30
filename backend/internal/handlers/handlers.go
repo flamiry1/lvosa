@@ -41,6 +41,10 @@ func handleError(err error, c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": models.ErrUnauthorized.Error()})
 		return
 	}
+	if errors.Is(err, models.ErrForbidden) {
+		c.JSON(http.StatusForbidden, gin.H{"status": models.ErrForbidden.Error()})
+		return
+	}
 	slog.Error("internal error", "err", err)
 	c.JSON(http.StatusInternalServerError, gin.H{"status": "internal server error"})
 }
@@ -53,8 +57,8 @@ func NewItemHandler(s Service) *Handler {
 	return &Handler{svc: s}
 }
 
-func (h *Handler) RegisterRouters(r *gin.Engine, m gin.HandlerFunc) {
-	authProtected := r.Group("", m)
+func (h *Handler) RegisterRouters(r *gin.Engine, authMiddleWare, checkRoleMiddleWare gin.HandlerFunc) {
+	authProtected := r.Group("", authMiddleWare, checkRoleMiddleWare)
 	{
 		authProtected.POST("/item", h.createItem)
 		authProtected.PUT("/item/:id", h.updateItem)
