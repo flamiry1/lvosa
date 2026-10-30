@@ -321,7 +321,6 @@ func TestAuthCurrentUser(t *testing.T) {
 }
 
 func TestMiddleware(t *testing.T) {
-
 	tests := []struct {
 		name                 string
 		email                string
@@ -384,6 +383,50 @@ func TestMiddleware(t *testing.T) {
 			}
 			if fakeAuth.currentUserReceivedToken != test.wantToken {
 				t.Fatalf("expected token: %s, received: %s", test.wantToken, fakeAuth.currentUserReceivedToken)
+			}
+		})
+	}
+}
+
+func TestCheckRole(t *testing.T) {
+	tests := []struct {
+		name             string
+		role             models.Role
+		userCtx          models.User
+		isUser           bool
+		wantCode         int
+		wantBody         string
+		wantHandleCalled bool
+	}{
+		{name: "valid: role admin", wantCode: http.StatusOK, role: models.RoleAdmin, userCtx: models.User{Email: "dima@gmail.com", PasswordHash: "secret-hash-value", Role: models.RoleAdmin}, isUser: true, wantBody: `{"result":"ok"}`, wantHandleCalled: true},
+		{name: "valid: role student for role student", wantCode: http.StatusOK, role: models.RoleStudent, userCtx: models.User{Email: "dima@gmail.com", PasswordHash: "secret-hash-value", Role: models.RoleStudent}, isUser: true, wantBody: `{"result":"ok"}`, wantHandleCalled: true},
+		{name: "invalid: role student for role admin", wantCode: http.StatusForbidden, role: models.RoleAdmin, userCtx: models.User{Email: "dima@gmail.com", PasswordHash: "secret-hash-value", Role: models.RoleStudent}, isUser: true, wantBody: `{"status":"forbidden"}`, wantHandleCalled: false},
+		{name: "invalid: no user set in context", wantCode: http.StatusInternalServerError, role: models.RoleAdmin, userCtx: models.User{Email: "dima@gmail.com", PasswordHash: "secret-hash-value", Role: models.RoleAdmin}, isUser: false, wantBody: `{"status":"internal server error"}`, wantHandleCalled: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handleCalled := false
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			router.Use(gin.Recovery())
+			router.GET("/admin-only", func(c *gin.Context) {
+				if test.isUser {
+					c.Set(userCtxKey, test.userCtx)
+				}
+				c.Next()
+			}, AuthCheckRole(test.role), func(c *gin.Context) {
+				handleCalled = true
+				c.JSON(http.StatusOK, gin.H{"result": "ok"})
+			})
+			rec := doRequest(t, router, http.MethodGet, "/admin-only", "", "")
+			if rec.Code != test.wantCode {
+				t.Fatalf("expected status %d, received: %d", test.wantCode, rec.Code)
+			}
+			if handleCalled != test.wantHandleCalled {
+				t.Fatalf("expected handle be called, received: %v", handleCalled)
+			}
+			if rec.Body.String() != test.wantBody {
+				t.Fatalf("expected body: %v, received: %v", test.wantBody, rec.Body.String())
 			}
 		})
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"lvosa/backend/internal/config"
 	"lvosa/backend/internal/handlers"
+	"lvosa/backend/internal/models"
 	"lvosa/backend/internal/service"
 	"lvosa/backend/internal/store/postgres"
 	"lvosa/backend/internal/store/redisstore"
@@ -55,6 +56,6 @@ func newRouter(p *pgxpool.Pool, rdb *redis.Client, c *config.Config) (*gin.Engin
 	authHandler := handlers.NewAuthHandler(authService, c.SessionTTL, c.Secure)
 	authHandler.RegisterRouters(r)
 	itemsHandler := handlers.NewItemHandler(itemService)
-	itemsHandler.RegisterRouters(r, authHandler.AuthMiddleware())
+	itemsHandler.RegisterRouters(r, authHandler.AuthMiddleware(), handlers.AuthCheckRole(models.RoleAdmin))
 	return r, nil
 }

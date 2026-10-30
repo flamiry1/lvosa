@@ -67,6 +67,23 @@ func (a *AuthHandler) setCookieSession(c *gin.Context, value string, ttl int) {
 	c.SetCookie(sessionKey, value, ttl, "/", "", a.secure, true)
 }
 
+func AuthCheckRole(role models.Role) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, err := getUserFromContext(c)
+		if err != nil {
+			handleError(fmt.Errorf("getUserFromContext returned: %v", err), c)
+			c.Abort()
+			return
+		}
+		if user.Role != role {
+			handleError(models.ErrForbidden, c)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func getUserFromContext(c *gin.Context) (models.User, error) {
 	rawUser, exists := c.Get(userCtxKey)
 	if !exists {
@@ -74,7 +91,7 @@ func getUserFromContext(c *gin.Context) (models.User, error) {
 	}
 	user, ok := rawUser.(models.User)
 	if !ok {
-		return models.User{}, fmt.Errorf("couldnt find user")
+		return models.User{}, models.ErrNoUserFound
 	}
 	return user, nil
 }
