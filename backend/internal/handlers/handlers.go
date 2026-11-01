@@ -45,6 +45,10 @@ func handleError(err error, c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"status": models.ErrForbidden.Error()})
 		return
 	}
+	if errors.Is(err, models.ErrTooManyRequests) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"status": models.ErrTooManyRequests.Error()})
+		return
+	}
 	slog.Error("internal error", "err", err)
 	c.JSON(http.StatusInternalServerError, gin.H{"status": "internal server error"})
 }

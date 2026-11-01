@@ -18,8 +18,10 @@ type Config struct {
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
 	PostgresDSN     string
-	RedisDSN        string
+	RedisDSNUsers   string
+	RedisDSNRates   string
 	SessionTTL      time.Duration
+	RateTTL         time.Duration
 	Secure          bool
 }
 
@@ -42,9 +44,13 @@ func Load() (Config, error) {
 	if cfg.PostgresDSN == "" {
 		return Config{}, fmt.Errorf("DB_DSN: empty db path")
 	}
-	cfg.RedisDSN = os.Getenv("REDIS_DSN")
-	if cfg.RedisDSN == "" {
-		return Config{}, fmt.Errorf("REDIS_DSN: empty db path")
+	cfg.RedisDSNUsers = os.Getenv("REDIS_DSN_USERS")
+	if cfg.RedisDSNUsers == "" {
+		return Config{}, fmt.Errorf("REDIS_DSN_USERS: empty db path")
+	}
+	cfg.RedisDSNRates = os.Getenv("REDIS_DSN_RATES")
+	if cfg.RedisDSNRates == "" {
+		return Config{}, fmt.Errorf("REDIS_DSN_RATES: empty db path")
 	}
 	if p := os.Getenv("PORT"); p == "" {
 		cfg.Port = ":8080"
@@ -93,6 +99,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	cfg.SessionTTL, err = getDuration("SESSION_TTL", 168*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.RateTTL, err = getDuration("LIMIT_RATE_TTL", 15*time.Minute)
 	if err != nil {
 		return Config{}, err
 	}

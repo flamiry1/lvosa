@@ -9,6 +9,7 @@ import (
 	"lvosa/backend/internal/models"
 	"lvosa/backend/internal/service"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -21,12 +22,34 @@ type SessionRepo struct {
 	ttl    time.Duration
 }
 
-func NewSessionRepo(client *redis.Client, t time.Duration) *SessionRepo {
-	return &SessionRepo{client: client, ttl: t}
+type RateLimiterRepo struct {
+	client *redis.Client
+	ttl    time.Duration
+}
+
+var upsertScript = redis.NewScript(`
+	local current = redis.call('INCR', KEYS[1])
+	if current == 1 then
+		redis.call('PEXPIRE', KEYS[1], ARGV[1])
+	end
+	return current
+	`)
+
+func NewSessionRepo(client *redis.Client, ttl time.Duration) *SessionRepo {
+	return &SessionRepo{client: client, ttl: ttl}
+}
+
+func NewRateLimiterRepo(client *redis.Client, ttl time.Duration) *RateLimiterRepo {
+	return &RateLimiterRepo{client: client, ttl: ttl}
 }
 
 func createKey(token string) string {
 	newKey := fmt.Sprintf("session:%s", token)
+	return newKey
+}
+
+func createRateKey(email string) string {
+	newKey := fmt.Sprintf("login_attempts:%s", strings.ToLower(email))
 	return newKey
 }
 
@@ -39,9 +62,9 @@ func (r *SessionRepo) Create(ctx context.Context, userID int) (string, error) {
 	token := base64.RawURLEncoding.EncodeToString(b)
 	key := createKey(token)
 	strUseID := strconv.Itoa(userID)
-	status := r.client.Set(ctx, key, strUseID, r.ttl)
-	if status.Err() != nil {
-		return "", fmt.Errorf("redis-set session: %w", status.Err())
+	err = r.client.Set(ctx, key, strUseID, r.ttl).Err()
+	if err != nil {
+		return "", fmt.Errorf("redis-set session: %w", err)
 	}
 	return token, nil
 }
@@ -67,6 +90,24 @@ func (r *SessionRepo) Delete(ctx context.Context, token string) error {
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)
+	}
+	return nil
+}
+
+func (r *RateLimiterRepo) IncreaseRate(ctx context.Context, email string) (int, error) {
+	key := createRateKey(email)
+	rate, err := upsertScript.Run(ctx, r.client, []string{key}, r.ttl.Milliseconds()).Int()
+	if err != nil {
+		return 0, fmt.Errorf("redis increase rate: %w", err)
+	}
+	return rate, nil
+}
+
+func (r *RateLimiterRepo) DropRate(ctx context.Context, email string) error {
+	key := createRateKey(email)
+	err := r.client.Del(ctx, key).Err()
+	if err != nil {
+		return fmt.Errorf("drop rate limiter: %w", err)
 	}
 	return nil
 }

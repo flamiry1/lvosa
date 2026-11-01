@@ -34,13 +34,14 @@ func run() error {
 	}
 	defer pool.Close()
 	slog.Info("postgres connected")
-	redisClient, err := redisConnect(startCtx, cfg.RedisDSN)
+	userClient, rateClient, err := getRedisClients(startCtx, cfg.RedisDSNUsers, cfg.RedisDSNRates)
 	if err != nil {
 		return err
 	}
-	defer redisClient.Close()
+	defer userClient.Close()
+	defer rateClient.Close()
 	slog.Info("redis connected")
-	r, err := newRouter(pool, redisClient, &cfg)
+	r, err := newRouter(pool, userClient, rateClient, &cfg)
 	if err != nil {
 		return err
 	}

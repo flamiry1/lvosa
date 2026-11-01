@@ -152,6 +152,7 @@ func TestAuthLogin(t *testing.T) {
 		{name: "invalid log in: invalid creds", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusUnauthorized, serviceErr: models.ErrInvalidCredentials, wantBody: `{"status":"wrong email or password"}`},
 		{name: "invalid log in: service error", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusInternalServerError, serviceErr: serviceErr, wantBody: `{"status":"internal server error"}`},
 		{name: "invalid log in: no password in body", body: `{"email":"dima@mail.com"}`, wantServiceLoginCalls: 0, wantEmail: "", wantPassword: "", wantCode: http.StatusBadRequest, serviceErr: nil},
+		{name: "invalid log in: service returns too many requests", body: `{"email":"dima@mail.com", "password": "test-password"}`, wantServiceLoginCalls: 1, wantEmail: "dima@mail.com", wantPassword: "test-password", wantCode: http.StatusTooManyRequests, serviceErr: models.ErrTooManyRequests, wantBody: `{"status":"too many requests"}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

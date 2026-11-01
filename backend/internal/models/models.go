@@ -38,3 +38,5 @@ var ErrUnauthorized = errors.New("unauthorized")
 var ErrForbidden = errors.New("forbidden")
 
 var ErrNoUserFound = errors.New("no user found")
+
+var ErrTooManyRequests = errors.New("too many requests")

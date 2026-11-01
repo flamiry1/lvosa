@@ -13,6 +13,7 @@ import (
 
 var _ UserRepository = (*fakeUserRepo)(nil)
 var _ SessionRepository = (*fakeSessionRepo)(nil)
+var _ RateLimiterRepository = (*fakeRateLimiterRepo)(nil)
 
 type fakeUserRepo struct {
 	saveUser         models.User
@@ -38,6 +39,14 @@ type fakeSessionRepo struct {
 	deleteCalls  int
 	errDelete    error
 	deleteToken  string
+}
+
+type fakeRateLimiterRepo struct {
+	increaseRateCalls int
+	dropRateCalls     int
+	returnRate        int
+	increaseRateErr   error
+	dropRateErr       error
 }
 
 func (r *fakeUserRepo) Create(ctx context.Context, user models.User) (models.User, error) {
@@ -93,6 +102,22 @@ func (r *fakeSessionRepo) Delete(ctx context.Context, token string) error {
 	return nil
 }
 
+func (r *fakeRateLimiterRepo) IncreaseRate(ctx context.Context, email string) (int, error) {
+	r.increaseRateCalls++
+	if r.increaseRateErr != nil {
+		return 0, r.increaseRateErr
+	}
+	return r.returnRate, nil
+}
+
+func (r *fakeRateLimiterRepo) DropRate(ctx context.Context, email string) error {
+	r.dropRateCalls++
+	if r.dropRateErr != nil {
+		return r.dropRateErr
+	}
+	return nil
+}
+
 func TestAuthService_Register(t *testing.T) {
 	errDB := errors.New("db down")
 	tests := []struct {
@@ -117,7 +142,8 @@ func TestAuthService_Register(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeURepo := &fakeUserRepo{errCreate: test.repoErr}
 			fakeSRepo := &fakeSessionRepo{}
-			srv, err := NewAuthService(fakeURepo, fakeSRepo)
+			fakeRateRepo := &fakeRateLimiterRepo{}
+			srv, err := NewAuthService(fakeURepo, fakeSRepo, fakeRateRepo, 5)
 			if err != nil {
 				t.Fatalf("create service: %v", err)
 			}
@@ -180,7 +206,8 @@ func TestAuthService_Login(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeSRepo := &fakeSessionRepo{createToken: "test-token", errCreate: test.repoRedisErr, returnUserID: test.returnID}
 			fakeURepo := &fakeUserRepo{errFindByEmail: test.repoPGErr, returnUser: models.User{Email: "dima@gmail.com", PasswordHash: string(hashedPassword), ID: 7}}
-			srv, err := NewAuthService(fakeURepo, fakeSRepo)
+			fakeRateRepo := &fakeRateLimiterRepo{returnRate: 1}
+			srv, err := NewAuthService(fakeURepo, fakeSRepo, fakeRateRepo, 5)
 			if err != nil {
 				t.Fatalf("create service: %v", err)
 			}
@@ -213,7 +240,8 @@ func TestAuthService_Login(t *testing.T) {
 func TestAuthService_LogoutValid(t *testing.T) {
 	fakeSRepo := &fakeSessionRepo{}
 	fakeURepo := &fakeUserRepo{}
-	srv, err := NewAuthService(fakeURepo, fakeSRepo)
+	fakeRateRepo := &fakeRateLimiterRepo{}
+	srv, err := NewAuthService(fakeURepo, fakeSRepo, fakeRateRepo, 5)
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
@@ -231,7 +259,8 @@ func TestAuthService_LogoutInValid(t *testing.T) {
 	errRDB := errors.New("rdb down")
 	fakeSRepo := &fakeSessionRepo{errDelete: errRDB}
 	fakeURepo := &fakeUserRepo{}
-	srv, err := NewAuthService(fakeURepo, fakeSRepo)
+	fakeRateRepo := &fakeRateLimiterRepo{}
+	srv, err := NewAuthService(fakeURepo, fakeSRepo, fakeRateRepo, 5)
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
@@ -250,14 +279,14 @@ func TestAuthService_CurrentUser(t *testing.T) {
 		findByIDErr       error
 		token             string
 		wantErr           error
-		wantFindIDByCalls int
+		wantFindByIDCalls int
 		wantUserID        int
 	}{
-		{name: "valid get current user", token: "test-token", findByIDErr: nil, wantErr: nil, wantFindIDByCalls: 1, wantUserID: 77, getErr: nil},
-		{name: "get returned not found", token: "test-token", findByIDErr: nil, wantErr: models.ErrUnauthorized, wantFindIDByCalls: 0, wantUserID: 0, getErr: models.ErrNotFound},
-		{name: "findByID return not found", token: "test-token", findByIDErr: models.ErrNotFound, wantErr: models.ErrUnauthorized, wantFindIDByCalls: 1, wantUserID: 0, getErr: nil},
-		{name: "redis error", token: "test-token", findByIDErr: nil, wantErr: rDBErr, wantFindIDByCalls: 0, wantUserID: 0, getErr: rDBErr},
-		{name: "postgre error", token: "test-token", findByIDErr: dbErr, wantErr: dbErr, wantFindIDByCalls: 1, wantUserID: 0, getErr: nil},
+		{name: "valid get current user", token: "test-token", findByIDErr: nil, wantErr: nil, wantFindByIDCalls: 1, wantUserID: 77, getErr: nil},
+		{name: "get returned not found", token: "test-token", findByIDErr: nil, wantErr: models.ErrUnauthorized, wantFindByIDCalls: 0, wantUserID: 0, getErr: models.ErrNotFound},
+		{name: "findByID return not found", token: "test-token", findByIDErr: models.ErrNotFound, wantErr: models.ErrUnauthorized, wantFindByIDCalls: 1, wantUserID: 0, getErr: nil},
+		{name: "redis error", token: "test-token", findByIDErr: nil, wantErr: rDBErr, wantFindByIDCalls: 0, wantUserID: 0, getErr: rDBErr},
+		{name: "postgre error", token: "test-token", findByIDErr: dbErr, wantErr: dbErr, wantFindByIDCalls: 1, wantUserID: 0, getErr: nil},
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if err != nil {
@@ -267,7 +296,8 @@ func TestAuthService_CurrentUser(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeSRepo := &fakeSessionRepo{returnUserID: 77, errGet: test.getErr}
 			fakeURepo := &fakeUserRepo{returnUser: models.User{ID: 77, Email: "dimas@bog.mail", PasswordHash: string(hashedPassword)}, errFindByID: test.findByIDErr}
-			srv, err := NewAuthService(fakeURepo, fakeSRepo)
+			fakeRateRepo := &fakeRateLimiterRepo{}
+			srv, err := NewAuthService(fakeURepo, fakeSRepo, fakeRateRepo, 5)
 			if err != nil {
 				t.Fatalf("create service: %v", err)
 			}
@@ -284,13 +314,75 @@ func TestAuthService_CurrentUser(t *testing.T) {
 			if fakeSRepo.getToken != test.token {
 				t.Fatalf("expected token: %s, received: %s", test.token, fakeSRepo.getToken)
 			}
-			if fakeURepo.findByIDCalls != test.wantFindIDByCalls {
-				t.Fatalf("expected FindBy call: %d, received: %d", test.wantFindIDByCalls, fakeURepo.findByIDCalls)
+			if fakeURepo.findByIDCalls != test.wantFindByIDCalls {
+				t.Fatalf("expected FindBy call: %d, received: %d", test.wantFindByIDCalls, fakeURepo.findByIDCalls)
 			}
-			if test.wantFindIDByCalls > 0 {
+			if test.wantFindByIDCalls > 0 {
 				if fakeURepo.lastID != 77 {
 					t.Fatalf("expected lastID: 77, received: %d", fakeURepo.lastID)
 				}
+			}
+		})
+	}
+}
+
+func TestAuthService_LoginRateLimiter(t *testing.T) {
+	const limit = 5
+	rDBErr := errors.New("rdb down")
+	tests := []struct {
+		name                   string
+		email                  string
+		password               string
+		rate                   int
+		increaseRateErr        error
+		dropRateErr            error
+		findByEmailErr         error
+		wantErr                error
+		wantIncreaseRateCalls  int
+		wantFindByEmailCalls   int
+		wantDropRateCalls      int
+		wantSessionCreateCalls int
+	}{
+		{name: "valid login: first attempt", email: "dima@gmail.com", password: "password", rate: 1, wantErr: nil, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 1, wantSessionCreateCalls: 1},
+		{name: "valid login: last allowed attempt", email: "dima@gmail.com", password: "password", rate: limit, wantErr: nil, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 1, wantSessionCreateCalls: 1},
+		{name: "invalid login: last allowed attempt, password invalid", email: "dima@gmail.com", password: "pass", rate: limit, wantErr: models.ErrInvalidCredentials, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "blocked: first attempt over limit, password valid", email: "dima@gmail.com", password: "password", rate: limit + 1, wantErr: models.ErrTooManyRequests, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "blocked: first attempt over limit, password invalid", email: "dima@gmail.com", password: "pass", rate: limit + 1, wantErr: models.ErrTooManyRequests, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "blocked: far over limit after burst", email: "dima@gmail.com", password: "password", rate: 50, wantErr: models.ErrTooManyRequests, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "invalid login: password invalid", email: "dima@gmail.com", password: "pass", rate: 1, wantErr: models.ErrInvalidCredentials, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "invalid login: no such email", email: "d@gmail.com", password: "password", rate: 1, findByEmailErr: models.ErrNotFound, wantErr: models.ErrInvalidCredentials, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "invalid login: bad email format still counted", email: "dima", password: "password", rate: 1, wantErr: models.ErrBadRequest, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "failed login: rdb down while increasing rate", email: "dima@gmail.com", password: "password", increaseRateErr: rDBErr, wantErr: rDBErr, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "valid login: rdb down while dropping rate", email: "dima@gmail.com", password: "password", rate: 1, dropRateErr: rDBErr, wantErr: nil, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 1, wantSessionCreateCalls: 1},
+	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("create a user: %v", err)
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeSRepo := &fakeSessionRepo{}
+			fakeURepo := &fakeUserRepo{returnUser: models.User{ID: 77, Email: "dima@gmail.com", PasswordHash: string(hashedPassword)}, errFindByEmail: test.findByEmailErr}
+			fakeRateRepo := &fakeRateLimiterRepo{returnRate: test.rate, increaseRateErr: test.increaseRateErr, dropRateErr: test.dropRateErr}
+			srv, err := NewAuthService(fakeURepo, fakeSRepo, fakeRateRepo, limit)
+			if err != nil {
+				t.Fatalf("create service: %v", err)
+			}
+			_, _, err = srv.Login(context.Background(), test.email, test.password)
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("want error: %v, received: %v", test.wantErr, err)
+			}
+			if fakeRateRepo.increaseRateCalls != test.wantIncreaseRateCalls {
+				t.Fatalf("expected increase rate calls: %d, received: %d", test.wantIncreaseRateCalls, fakeRateRepo.increaseRateCalls)
+			}
+			if fakeURepo.findByEmailCalls != test.wantFindByEmailCalls {
+				t.Fatalf("expected find by email calls: %d, received: %d", test.wantFindByEmailCalls, fakeURepo.findByEmailCalls)
+			}
+			if fakeRateRepo.dropRateCalls != test.wantDropRateCalls {
+				t.Fatalf("expected drop rate calls: %d, received: %d", test.wantDropRateCalls, fakeRateRepo.dropRateCalls)
+			}
+			if fakeSRepo.createCalls != test.wantSessionCreateCalls {
+				t.Fatalf("expected session create calls: %d, received: %d", test.wantSessionCreateCalls, fakeSRepo.createCalls)
 			}
 		})
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"lvosa/backend/internal/models"
 	"net/mail"
 	"strings"
@@ -23,18 +24,26 @@ type SessionRepository interface {
 	Get(ctx context.Context, token string) (int, error)
 	Delete(ctx context.Context, token string) error
 }
-type AuthService struct {
-	usersRepo   UserRepository
-	sessionRepo SessionRepository
-	stopPass    []byte
+
+type RateLimiterRepository interface {
+	IncreaseRate(ctx context.Context, email string) (int, error)
+	DropRate(ctx context.Context, email string) error
 }
 
-func NewAuthService(r UserRepository, s SessionRepository) (*AuthService, error) {
+type AuthService struct {
+	usersRepo       UserRepository
+	sessionRepo     SessionRepository
+	rateRepo        RateLimiterRepository
+	maxLoginAttemps int
+	stopPass        []byte
+}
+
+func NewAuthService(u UserRepository, s SessionRepository, r RateLimiterRepository, attempts int) (*AuthService, error) {
 	hashedStopPass, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("generate stopPass: %w", err)
 	}
-	return &AuthService{usersRepo: r, sessionRepo: s, stopPass: hashedStopPass}, nil
+	return &AuthService{usersRepo: u, sessionRepo: s, rateRepo: r, stopPass: hashedStopPass, maxLoginAttemps: attempts}, nil
 }
 
 func checkEmail(email string) (string, error) {
@@ -73,6 +82,13 @@ func (a *AuthService) Register(ctx context.Context, email, password string) (mod
 }
 
 func (a *AuthService) Login(ctx context.Context, email, password string) (models.User, string, error) {
+	rate, err := a.rateRepo.IncreaseRate(ctx, email)
+	if err != nil {
+		return models.User{}, "", fmt.Errorf("increase user's rate limiter: %w", err)
+	}
+	if rate > a.maxLoginAttemps {
+		return models.User{}, "", models.ErrTooManyRequests
+	}
 	checkedEmail, err := checkEmail(email)
 	if err != nil {
 		return models.User{}, "", err
@@ -88,6 +104,10 @@ func (a *AuthService) Login(ctx context.Context, email, password string) (models
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
 		return models.User{}, "", models.ErrInvalidCredentials
+	}
+	err = a.rateRepo.DropRate(ctx, email)
+	if err != nil {
+		slog.Error("error while dropping rate", "err", err)
 	}
 	user.PasswordHash = ""
 	token, err := a.sessionRepo.Create(ctx, user.ID)
