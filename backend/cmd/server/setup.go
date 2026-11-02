@@ -15,8 +15,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const maxAttempts int = 5
-
 func postgresConnect(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -44,9 +42,9 @@ func redisConnect(ctx context.Context, dsn string) (*redis.Client, error) {
 	return client, nil
 }
 
-func getRedisClients(ctx context.Context, dsnU, dsnR string) (*redis.Client, *redis.Client, error) {
-	dsnUsers, dsnRates := dsnU, dsnR
-	clientUser, err := redisConnect(ctx, dsnUsers)
+func getRedisClients(ctx context.Context, dsnS, dsnR string) (*redis.Client, *redis.Client, error) {
+	dsnUsers, dsnRates := dsnS, dsnR
+	clientSessions, err := redisConnect(ctx, dsnUsers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -54,16 +52,16 @@ func getRedisClients(ctx context.Context, dsnU, dsnR string) (*redis.Client, *re
 	if err != nil {
 		return nil, nil, err
 	}
-	return clientUser, clientRates, nil
+	return clientSessions, clientRates, nil
 }
 
-func newRouter(p *pgxpool.Pool, userDb, rateDb *redis.Client, c *config.Config) (*gin.Engine, error) {
+func newRouter(p *pgxpool.Pool, sessionDb, rateDb *redis.Client, c *config.Config) (*gin.Engine, error) {
 	itemRepo := postgres.NewItemRepo(p)
 	itemService := service.NewItemService(itemRepo)
-	sessionRepo := redisstore.NewSessionRepo(userDb, c.SessionTTL)
+	sessionRepo := redisstore.NewSessionRepo(sessionDb, c.SessionTTL)
 	rateRepo := redisstore.NewRateLimiterRepo(rateDb, c.RateTTL)
 	usersRepo := postgres.NewUserRepo(p)
-	authService, err := service.NewAuthService(usersRepo, sessionRepo, rateRepo, maxAttempts)
+	authService, err := service.NewAuthService(usersRepo, sessionRepo, rateRepo, c.LoginAttempts)
 	if err != nil {
 		return nil, err
 	}

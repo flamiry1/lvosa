@@ -351,7 +351,7 @@ func TestAuthService_LoginRateLimiter(t *testing.T) {
 		{name: "blocked: far over limit after burst", email: "dima@gmail.com", password: "password", rate: 50, wantErr: models.ErrTooManyRequests, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
 		{name: "invalid login: password invalid", email: "dima@gmail.com", password: "pass", rate: 1, wantErr: models.ErrInvalidCredentials, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
 		{name: "invalid login: no such email", email: "d@gmail.com", password: "password", rate: 1, findByEmailErr: models.ErrNotFound, wantErr: models.ErrInvalidCredentials, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
-		{name: "invalid login: bad email format still counted", email: "dima", password: "password", rate: 1, wantErr: models.ErrBadRequest, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
+		{name: "invalid login: bad email format not counted", email: "dima", password: "password", rate: 1, wantErr: models.ErrBadRequest, wantIncreaseRateCalls: 0, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
 		{name: "failed login: rdb down while increasing rate", email: "dima@gmail.com", password: "password", increaseRateErr: rDBErr, wantErr: rDBErr, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 0, wantDropRateCalls: 0, wantSessionCreateCalls: 0},
 		{name: "valid login: rdb down while dropping rate", email: "dima@gmail.com", password: "password", rate: 1, dropRateErr: rDBErr, wantErr: nil, wantIncreaseRateCalls: 1, wantFindByEmailCalls: 1, wantDropRateCalls: 1, wantSessionCreateCalls: 1},
 	}

@@ -82,16 +82,16 @@ func (a *AuthService) Register(ctx context.Context, email, password string) (mod
 }
 
 func (a *AuthService) Login(ctx context.Context, email, password string) (models.User, string, error) {
-	rate, err := a.rateRepo.IncreaseRate(ctx, email)
+	checkedEmail, err := checkEmail(email)
+	if err != nil {
+		return models.User{}, "", err
+	}
+	rate, err := a.rateRepo.IncreaseRate(ctx, checkedEmail)
 	if err != nil {
 		return models.User{}, "", fmt.Errorf("increase user's rate limiter: %w", err)
 	}
 	if rate > a.maxLoginAttemps {
 		return models.User{}, "", models.ErrTooManyRequests
-	}
-	checkedEmail, err := checkEmail(email)
-	if err != nil {
-		return models.User{}, "", err
 	}
 	user, err := a.usersRepo.FindByEmail(ctx, checkedEmail)
 	if err != nil {
@@ -105,7 +105,7 @@ func (a *AuthService) Login(ctx context.Context, email, password string) (models
 	if err != nil {
 		return models.User{}, "", models.ErrInvalidCredentials
 	}
-	err = a.rateRepo.DropRate(ctx, email)
+	err = a.rateRepo.DropRate(ctx, checkedEmail)
 	if err != nil {
 		slog.Error("error while dropping rate", "err", err)
 	}

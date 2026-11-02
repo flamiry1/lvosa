@@ -23,6 +23,7 @@ type Config struct {
 	SessionTTL      time.Duration
 	RateTTL         time.Duration
 	Secure          bool
+	LoginAttempts   int
 }
 
 func getDuration(n string, def time.Duration) (time.Duration, error) {
@@ -44,9 +45,9 @@ func Load() (Config, error) {
 	if cfg.PostgresDSN == "" {
 		return Config{}, fmt.Errorf("DB_DSN: empty db path")
 	}
-	cfg.RedisDSNUsers = os.Getenv("REDIS_DSN_USERS")
+	cfg.RedisDSNUsers = os.Getenv("REDIS_DSN_SESSIONS")
 	if cfg.RedisDSNUsers == "" {
-		return Config{}, fmt.Errorf("REDIS_DSN_USERS: empty db path")
+		return Config{}, fmt.Errorf("REDIS_DSN_SESSIONS: empty db path")
 	}
 	cfg.RedisDSNRates = os.Getenv("REDIS_DSN_RATES")
 	if cfg.RedisDSNRates == "" {
@@ -115,6 +116,19 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("wrong format for COOKIE_SECURE: %v", err)
 		}
 		cfg.Secure = parsedSecure
+	}
+	loginAttempts := os.Getenv("LOGIN_ATTEMPTS")
+	if loginAttempts == "" {
+		cfg.LoginAttempts = 5
+	} else {
+		attempts, err := strconv.Atoi(loginAttempts)
+		if err != nil {
+			return Config{}, fmt.Errorf("wrong format for LOGIN_ATTEMPTS: %v", err)
+		}
+		if attempts <= 0 {
+			return Config{}, fmt.Errorf("LOGIN_ATTEMPTS cannot be 0 or less than 0")
+		}
+		cfg.LoginAttempts = attempts
 	}
 	return cfg, nil
 }

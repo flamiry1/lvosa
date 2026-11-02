@@ -17,9 +17,9 @@ const testTTL time.Duration = 3 * time.Second
 
 func initRedisRepo(t *testing.T) (*SessionRepo, *RateLimiterRepo) {
 	t.Helper()
-	testDbDsn := os.Getenv("TEST_REDIS_DSN")
+	testDbDsn := os.Getenv("TEST_REDIS_DSN_SESSIONS")
 	if testDbDsn == "" {
-		t.Skip("TEST_REDIS_DSN not specified")
+		t.Skip("TEST_REDIS_DSN_SESSIONS not specified")
 	}
 	opts, err := redis.ParseURL(testDbDsn)
 	if err != nil {

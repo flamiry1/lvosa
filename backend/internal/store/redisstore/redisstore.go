@@ -43,7 +43,7 @@ func NewRateLimiterRepo(client *redis.Client, ttl time.Duration) *RateLimiterRep
 	return &RateLimiterRepo{client: client, ttl: ttl}
 }
 
-func createKey(token string) string {
+func createSessionKey(token string) string {
 	newKey := fmt.Sprintf("session:%s", token)
 	return newKey
 }
@@ -60,7 +60,7 @@ func (r *SessionRepo) Create(ctx context.Context, userID int) (string, error) {
 		return "", fmt.Errorf("generate token: %w", err)
 	}
 	token := base64.RawURLEncoding.EncodeToString(b)
-	key := createKey(token)
+	key := createSessionKey(token)
 	strUseID := strconv.Itoa(userID)
 	err = r.client.Set(ctx, key, strUseID, r.ttl).Err()
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *SessionRepo) Create(ctx context.Context, userID int) (string, error) {
 }
 
 func (r *SessionRepo) Get(ctx context.Context, token string) (int, error) {
-	key := createKey(token)
+	key := createSessionKey(token)
 	val, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
@@ -86,7 +86,7 @@ func (r *SessionRepo) Get(ctx context.Context, token string) (int, error) {
 }
 
 func (r *SessionRepo) Delete(ctx context.Context, token string) error {
-	key := createKey(token)
+	key := createSessionKey(token)
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)
