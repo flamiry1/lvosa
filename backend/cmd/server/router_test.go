@@ -54,11 +54,11 @@ func (c *client) doRequest(t *testing.T, method, path, body string) *httptest.Re
 
 func truncatePostgres(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	_, err := pool.Exec(ctx, `TRUNCATE items RESTART IDENTITY`)
+	_, err := pool.Exec(ctx, `TRUNCATE items RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("truncate postgre items table: %v", err)
 	}
-	_, err = pool.Exec(ctx, `TRUNCATE users RESTART IDENTITY`)
+	_, err = pool.Exec(ctx, `TRUNCATE users RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("truncate postgre users table: %v", err)
 	}

@@ -30,7 +30,7 @@ func initUserRepo(t *testing.T) *UserRepo {
 		t.Fatalf("failed to connect to db: %v", err)
 	}
 	repo := NewUserRepo(pool)
-	_, err = repo.pool.Exec(ctx, `TRUNCATE users RESTART IDENTITY`)
+	_, err = repo.pool.Exec(ctx, `TRUNCATE users RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("failed to truncate table: %v", err)
 	}

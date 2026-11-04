@@ -31,7 +31,7 @@ func initRepo(t *testing.T) *ItemRepo {
 		t.Fatalf("connect to db: %v", err)
 	}
 	repo := NewItemRepo(pool)
-	_, err = repo.pool.Exec(ctx, `TRUNCATE items RESTART IDENTITY`)
+	_, err = repo.pool.Exec(ctx, `TRUNCATE items RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("truncate table: %v", err)
 	}
