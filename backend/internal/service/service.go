@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"lvosa/backend/internal/models"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 )
 
 type ItemService struct {

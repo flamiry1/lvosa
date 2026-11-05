@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"lvosa/backend/internal/models"
 	"net/mail"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
 )

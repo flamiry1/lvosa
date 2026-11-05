@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"lvosa/backend/internal/models"
 	"net/http"
 	"strconv"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

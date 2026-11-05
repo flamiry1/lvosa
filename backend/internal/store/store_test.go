@@ -3,10 +3,11 @@ package store
 import (
 	"context"
 	"errors"
-	"lvosa/backend/internal/models"
 	"slices"
 	"sync"
 	"testing"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 )
 
 func createStore(t *testing.T) *ItemMemory {

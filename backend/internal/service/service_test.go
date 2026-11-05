@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"lvosa/backend/internal/models"
 	"strings"
 	"testing"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 )
 
 type fakeRepo struct {

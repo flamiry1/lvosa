@@ -1,4 +1,4 @@
-module lvosa
+module github.com/flamiry1/lvosa
 
 go 1.26.2
 

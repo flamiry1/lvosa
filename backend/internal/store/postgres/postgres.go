@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"lvosa/backend/internal/models"
-	"lvosa/backend/internal/service"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
+	"github.com/flamiry1/lvosa/backend/internal/service"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

@@ -26,6 +26,13 @@ type Config struct {
 	LoginAttempts   int
 }
 
+// func env(k, def string) string {
+// 	if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+// 		return v
+// 	}
+// 	return def
+// }
+
 func getDuration(n string, def time.Duration) (time.Duration, error) {
 	t := os.Getenv(n)
 	if t == "" {

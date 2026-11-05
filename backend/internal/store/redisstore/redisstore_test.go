@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"lvosa/backend/internal/models"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"github.com/redis/go-redis/v9"
 )

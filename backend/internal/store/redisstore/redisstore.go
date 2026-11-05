@@ -6,11 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"lvosa/backend/internal/models"
-	"lvosa/backend/internal/service"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
+	"github.com/flamiry1/lvosa/backend/internal/service"
 
 	"github.com/redis/go-redis/v9"
 )

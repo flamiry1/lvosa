@@ -3,9 +3,10 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"lvosa/backend/internal/models"
 	"net/http"
 	"time"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

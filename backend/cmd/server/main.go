@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"lvosa/backend/internal/config"
+	"github.com/flamiry1/lvosa/backend/internal/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

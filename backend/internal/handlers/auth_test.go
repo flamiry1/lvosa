@@ -3,11 +3,12 @@ package handlers
 import (
 	"context"
 	"errors"
-	"lvosa/backend/internal/models"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

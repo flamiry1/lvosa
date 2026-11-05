@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"lvosa/backend/internal/config"
-	"lvosa/backend/internal/handlers"
-	"lvosa/backend/internal/models"
-	"lvosa/backend/internal/service"
-	"lvosa/backend/internal/store/postgres"
-	"lvosa/backend/internal/store/redisstore"
+
+	"github.com/flamiry1/lvosa/backend/internal/config"
+
+	"github.com/flamiry1/lvosa/backend/internal/handlers"
+	"github.com/flamiry1/lvosa/backend/internal/models"
+	"github.com/flamiry1/lvosa/backend/internal/service"
+	"github.com/flamiry1/lvosa/backend/internal/store/postgres"
+	"github.com/flamiry1/lvosa/backend/internal/store/redisstore"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"

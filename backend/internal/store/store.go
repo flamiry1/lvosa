@@ -3,10 +3,11 @@ package store
 import (
 	"context"
 	"fmt"
-	"lvosa/backend/internal/models"
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 )
 
 type ItemMemory struct {

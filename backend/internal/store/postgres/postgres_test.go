@@ -3,12 +3,13 @@ package postgres
 import (
 	"context"
 	"errors"
-	"lvosa/backend/internal/models"
 	"os"
 	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

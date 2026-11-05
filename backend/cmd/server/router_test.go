@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"errors"
-	"lvosa/backend/internal/config"
-	"lvosa/backend/internal/models"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/flamiry1/lvosa/backend/internal/config"
+	"github.com/flamiry1/lvosa/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
