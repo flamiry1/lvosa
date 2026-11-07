@@ -21,6 +21,11 @@ type Service interface {
 	Delete(ctx context.Context, id int) error
 }
 
+type GenerationCreator interface {
+	Create(ctx context.Context, req models.GenerationRequest) (int, error)
+	Get(ctx context.Context, id, userID int) (models.GenerationRequest, error)
+}
+
 func handleError(err error, c *gin.Context) {
 	if errors.Is(err, models.ErrBadRequest) {
 		c.JSON(http.StatusBadRequest, gin.H{"status": models.ErrBadRequest.Error(), "message": err.Error()})
@@ -55,19 +60,83 @@ func handleError(err error, c *gin.Context) {
 }
 
 type Handler struct {
-	svc Service
+	svc  Service
+	gSvc GenerationCreator
 }
 
-func NewItemHandler(s Service) *Handler {
-	return &Handler{svc: s}
+func NewItemHandler(s Service, g GenerationCreator) *Handler {
+	return &Handler{svc: s, gSvc: g}
+}
+
+func (h *Handler) CreateGenerationRequest(c *gin.Context) {
+	var in struct {
+		Level      string `json:"level" binding:"required"`
+		Topic      string `json:"topic" binding:"required"`
+		Difficulty string `json:"difficulty" binding:"required"`
+		Focus      string `json:"focus" binding:"required"`
+		Size       string `json:"size" binding:"required"`
+	}
+	user, err := getUserFromContext(c)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
+	err = c.ShouldBindJSON(&in)
+	if err != nil {
+		err = fmt.Errorf("%w: %w", models.ErrBadRequest, err)
+		handleError(err, c)
+		return
+	}
+	convertedIn := models.GenerationRequest{
+		UserID:     user.ID,
+		Level:      models.Level(in.Level),
+		Topic:      in.Topic,
+		Difficulty: models.Difficulty(in.Difficulty),
+		Focus:      models.Focus(in.Focus),
+		Size:       models.Size(in.Size),
+	}
+	ctx := c.Request.Context()
+	id, err := h.gSvc.Create(ctx, convertedIn)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"status": "accepted", "id": id})
+
+}
+
+func (h *Handler) GetGenerationRequest(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		err = fmt.Errorf("%w: %w", err, models.ErrBadRequest)
+		handleError(err, c)
+		return
+	}
+	ctx := c.Request.Context()
+	user, err := getUserFromContext(c)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
+	req, err := h.gSvc.Get(ctx, id, user.ID)
+	if err != nil {
+		handleError(err, c)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": req.Status, "lesson_id": req.LessonID, "error": req.Error})
 }
 
 func (h *Handler) RegisterRouters(r *gin.Engine, authMiddleWare, checkRoleMiddleWare gin.HandlerFunc) {
-	authProtected := r.Group("", authMiddleWare, checkRoleMiddleWare)
+	authRoleProtected := r.Group("", authMiddleWare, checkRoleMiddleWare)
 	{
-		authProtected.POST("/item", h.createItem)
-		authProtected.PUT("/item/:id", h.updateItem)
-		authProtected.DELETE("/item/:id", h.deleteItem)
+		authRoleProtected.POST("/item", h.createItem)
+		authRoleProtected.PUT("/item/:id", h.updateItem)
+		authRoleProtected.DELETE("/item/:id", h.deleteItem)
+	}
+	authProtected := r.Group("", authMiddleWare)
+	{
+		authProtected.POST("/generations", h.CreateGenerationRequest)
+		authProtected.GET("/generations/:id", h.GetGenerationRequest)
 	}
 	r.GET("/item/:id", h.getItem)
 	r.GET("/items", h.allItems)

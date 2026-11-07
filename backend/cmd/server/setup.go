@@ -63,6 +63,8 @@ func newRouter(p *pgxpool.Pool, sessionDb, rateDb *redis.Client, c *config.Confi
 	sessionRepo := redisstore.NewSessionRepo(sessionDb, c.SessionTTL)
 	rateRepo := redisstore.NewRateLimiterRepo(rateDb, c.RateTTL)
 	usersRepo := postgres.NewUserRepo(p)
+	generationRepo := postgres.NewGenerationRequestRepo(p)
+	generationService := service.NewGenerationService(generationRepo)
 	authService, err := service.NewAuthService(usersRepo, sessionRepo, rateRepo, c.LoginAttempts)
 	if err != nil {
 		return nil, err
@@ -71,7 +73,7 @@ func newRouter(p *pgxpool.Pool, sessionDb, rateDb *redis.Client, c *config.Confi
 	r.Use(gin.Logger(), gin.Recovery())
 	authHandler := handlers.NewAuthHandler(authService, c.SessionTTL, c.Secure)
 	authHandler.RegisterRouters(r)
-	itemsHandler := handlers.NewItemHandler(itemService)
+	itemsHandler := handlers.NewItemHandler(itemService, generationService)
 	itemsHandler.RegisterRouters(r, authHandler.AuthMiddleware(), handlers.AuthCheckRole(models.RoleAdmin))
 	return r, nil
 }

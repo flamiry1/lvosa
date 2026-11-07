@@ -160,3 +160,29 @@ type Exercise struct {
 	Content   json.RawMessage `json:"content"`
 	CreatedAt time.Time       `json:"created_at"`
 }
+
+type GenerationStatus string
+
+const (
+	GenerationStatusPending    GenerationStatus = "pending"
+	GenerationStatusProcessing GenerationStatus = "processing"
+	GenerationStatusDone       GenerationStatus = "done"
+	GenerationStatusFailed     GenerationStatus = "failed"
+)
+
+type GenerationRequest struct {
+	ID         int              `json:"id"`
+	UserID     int              `json:"user_id"`
+	LessonID   *int             `json:"lesson_id"`
+	Level      Level            `json:"level"`
+	Topic      string           `json:"topic"`
+	Difficulty Difficulty       `json:"difficulty"`
+	Focus      Focus            `json:"focus"`
+	Size       Size             `json:"size"`
+	Status     GenerationStatus `json:"status"`
+	Error      *string          `json:"error"`
+	Attempts   int              `json:"attempts"`
+	StartedAt  *time.Time       `json:"started_at"`
+	FinishedAt *time.Time       `json:"finished_at"`
+	CreatedAt  time.Time        `json:"created_at"`
+}

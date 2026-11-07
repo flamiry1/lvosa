@@ -22,7 +22,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	srv := service.NewItemService(s)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	h := NewItemHandler(srv)
+	h := NewItemHandler(srv, nil)
 	h.RegisterRouters(r, func(ctx *gin.Context) {}, func(ctx *gin.Context) {})
 	return r
 }
@@ -88,7 +88,7 @@ func TestServiceHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	h := NewItemHandler(fake)
+	h := NewItemHandler(fake, nil)
 	h.RegisterRouters(r, func(ctx *gin.Context) {}, func(ctx *gin.Context) {})
 	tests := []struct {
 		name        string
